@@ -6,60 +6,44 @@ import OrderCard from '../components/OrderCard';
 
 const MyOrders = () => {
   const {userData,myOrders} = useSelector(state=>state.user);
-  
+    
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('recent');
 
-  // Sample data - replace with your API call
+
   useEffect(() => {
-    const sampleOrders = [
-      {
-        id: 'ORD-1245',
-        restaurant: 'Spice Haven',
-        date: '2025-12-06T19:30:00',
-        status: 'Delivered',
-        rating: 4.8,
-        items: [
-          { name: 'Butter Chicken', price: 299, quantity: 1, total: 299, image: '/api/placeholder/64/64' },
-          { name: 'Garlic Naan', price: 49, quantity: 2, total: 98, image: '/api/placeholder/64/64' }
-        ],
-        deliveryFee: 45,
-        total: 442
-      },
-      {
-        id: 'ORD-1244',
-        restaurant: 'Burger Bonanza',
-        date: '2025-12-05T21:15:00',
-        status: 'Out for delivery',
-        rating: 0,
-        items: [
-          { name: 'Classic Cheeseburger', price: 189, quantity: 2, total: 378, image: '/api/placeholder/64/64' }
-        ],
-        deliveryFee: 35,
-        total: 413
-      },
-      {
-        id: 'ORD-1243',
-        restaurant: 'Pasta Palace',
-        date: '2025-12-04T18:45:00',
-        status: 'Delivered',
-        rating: 4.2,
-        items: [
-          { name: 'Chicken Alfredo', price: 349, quantity: 1, total: 349, image: '/api/placeholder/64/64' }
-        ],
-        deliveryFee: 50,
-        total: 399
-      }
-    ];
-    setOrders(sampleOrders);
-  }, []);
+    if (myOrders && Array.isArray(myOrders)) {
+      const formattedOrders = myOrders.flatMap(order => 
+        (order.shopOrders || []).map(shopOrder => ({
+          id: `${order._id}-${shopOrder._id}`,
+          originalOrderId: order._id,
+          shopId: shopOrder.shop?._id,
+          restaurant: shopOrder.shop?.name || 'Unknown Restaurant',
+          date: order.createdAt,
+          status: shopOrder.status || 'Pending',
+          rating: 0,
+          items: (shopOrder.shopOrderItems || []).map(item => ({
+            id: item.item?._id,
+            name: item.name || item.item?.name || 'Unknown Item',
+            price: item.price,
+            quantity: item.quantity,
+            total: item.price * item.quantity,
+            image: item.item?.image || '/api/placeholder/64/64'
+          })),
+          deliveryFee: 0,
+          total: shopOrder.subtotal || 0
+        }))
+      );
+      setOrders(formattedOrders);
+    }
+  }, [myOrders]);
 
   const filteredOrders = orders.filter(order => {
-    const matchesFilter = filter === 'all' || order.status.toLowerCase() === filter;
-    const matchesSearch = order.restaurant.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         order.id.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesFilter = filter === 'all' || (order.status || '').toLowerCase() === filter;
+    const matchesSearch = (order.restaurant || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         order.items.some(item => (item.name || '').toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesFilter && matchesSearch;
   }).sort((a, b) => {
     if (sortBy === 'recent') return new Date(b.date) - new Date(a.date);

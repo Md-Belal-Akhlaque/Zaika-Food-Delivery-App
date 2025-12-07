@@ -9,11 +9,9 @@ const useGetMyOrders = () => {
     useEffect(() => {
         const fetchOrder = async () => {
             try {
-                console.log(" Fetching from:", `${serverURL}/api/order/my-orders`);
                 const result = await axios.get(`${serverURL}/api/order/my-orders`, { 
                     withCredentials: true 
                 });
-                console.log(" Orders loaded:", result);
                 dispatch(setMyOrders(result.data));
             } catch (err) {
                 console.error(" getMyOrders failed:", {

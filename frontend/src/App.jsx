@@ -19,6 +19,7 @@ import CartPage from "./pages/CartPage";
 import CheckOut from "./pages/CheckOut";
 import Payment from "./pages/Payment";
 import MyOrders from "./pages/MyOrders";
+import RateOrder from "./pages/RateOrder";
 //dispatch ka use karke state ke under data ko daala tha 
 //selector ka use karke state ka slice dhundenge aur wo perticular state ho lekar show karenge
 export const serverURL = "http://localhost:8000"
@@ -95,6 +96,7 @@ function App() {
       <Route path ="/checkout" element={userData ? <CheckOut /> : <Navigate to="/signin" />} />
       <Route path ="/payment" element={userData ? <Payment /> : <Navigate to="/signin" />} />
       <Route path ="/my-orders" element={userData ? <MyOrders /> : <Navigate to="/signin" />} />
+      <Route path ="/rate-order" element={userData ? <RateOrder /> : <Navigate to="/signin" />} />
 
 
     </Routes>

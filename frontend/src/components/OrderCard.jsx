@@ -1,8 +1,10 @@
 // components/OrderCard.jsx - Fixed without date-fns dependency
 import React from 'react';
 import { Star, Clock, MapPin, Truck, CreditCard } from 'lucide-react';
+ import { useNavigate } from 'react-router-dom';
 
 const OrderCard = ({ order }) => {
+  const navigate = useNavigate();
   // Simple date formatter without date-fns
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -94,9 +96,18 @@ const OrderCard = ({ order }) => {
           <button className="flex-1 bg-gradient-to-r from-orange-500 to-red-500 text-white py-3 px-4 rounded-xl font-medium hover:from-orange-600 hover:to-red-600 transition-all duration-200 shadow-lg hover:shadow-xl">
             Reorder
           </button>
-          <button className="px-4 py-3 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200">
-            Track Again
-          </button>
+          {order.status === 'Delivered' ? (
+            <button 
+              onClick={() => navigate('/rate-order', { state: { order } })}
+              className="px-4 py-3 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200"
+            >
+              Rate Order
+            </button>
+          ) : (
+            <button className="px-4 py-3 border border-gray-200 rounded-xl text-gray-700 hover:bg-gray-50 transition-colors duration-200">
+              Track Order
+            </button>
+          )}
         </div>
       </div>
     </div>

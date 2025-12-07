@@ -36,7 +36,15 @@ const shopSchema = new mongoose.Schema({
     items:[{
         type: mongoose.Schema.Types.ObjectId,
         ref:"Item",
-    }]
+    }],
+    rating: {
+        type: Number,
+        default: 0
+    },
+    ratingCount: {
+        type: Number,
+        default: 0
+    }
 },{timestamps:true})  
 
 const Shop = mongoose.model("Shop",shopSchema)

@@ -98,7 +98,6 @@ const userSlice = createSlice({
       }
       
       state.cartItems = next;
-      console.log(' Added to cart:', id, 'Total items:', next.length);
     },
     
     //  FIXED: decreaseCartItem with BETTER logic
@@ -119,7 +118,6 @@ const userSlice = createSlice({
         .filter((item) => Number(item.quantity || 0) > 0);
       
       state.cartItems = next;
-      console.log(' Decreased cart:', id, 'Total items:', next.length);
     },
     
     //  NEW: Clear cart completely

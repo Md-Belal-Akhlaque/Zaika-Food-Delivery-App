@@ -11,6 +11,7 @@ import geoRouter from './routes/geo.routes.js';
 import shopRouter from './routes/shop.routes.js';
 import itemRouter from './routes/item.routes.js'
 import orderRouter from './routes/order.routes.js'
+import ratingRouter from './routes/rating.routes.js'
 
 const app = express();
 
@@ -30,5 +31,6 @@ app.use('/api/geo',geoRouter);
 app.use('/api/shop',shopRouter);
 app.use('/api/item',itemRouter);
 app.use('/api/order',orderRouter);
+app.use('/api/rating',ratingRouter);
 
 export default app;

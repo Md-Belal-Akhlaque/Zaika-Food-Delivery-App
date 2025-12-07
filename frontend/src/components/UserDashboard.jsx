@@ -214,7 +214,7 @@ const UserDashboard = () => {
                           {r.cuisine || "Restaurant"}
                         </span>
                         <span className="absolute top-2 right-2 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-                          ★ {r.rating || "4.5"}
+                          ★ {r.rating ? r.rating.toFixed(1) : "New"} {r.ratingCount ? `(${r.ratingCount})` : ""}
                         </span>
                       </div>
                       <div className="p-4">

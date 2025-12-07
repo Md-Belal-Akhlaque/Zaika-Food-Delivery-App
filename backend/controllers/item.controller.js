@@ -6,7 +6,6 @@ import AuditLog from "../models/auditLog.model.js";
 export const getItemById = async (req, res) => {
   try {
     const { itemId } = req.params;
-    console.log(" ITEM ID RECEIVED:", itemId);
     const item = await Item.findById(itemId);
     if (!item)
       return res

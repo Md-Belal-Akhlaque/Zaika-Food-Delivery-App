@@ -57,7 +57,6 @@ const Payment = () => {
         totalAmount: total,
       }, { withCredentials: true });
       
-      console.log(data);
 
       setIsProcessing(false);
 
@@ -76,7 +75,6 @@ const Payment = () => {
       navigate("/");
       
     } catch (err) {
-      console.log(err);
       setIsProcessing(false);
       Swal.fire({
         icon: 'error',

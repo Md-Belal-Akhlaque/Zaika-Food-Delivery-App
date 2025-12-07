@@ -10,7 +10,8 @@ const FoodCard = ({ data, onQuantityChange }) => {
   const image = data?.image || data?.imageUrl || (Array.isArray(data?.images) ? data.images[0] : undefined);
   const name = data?.name || data?.title;
   const cuisine = data?.cuisine || data?.category || data?.foodType || "Food";
-  const rating = typeof data?.rating === "object" ? data?.rating?.average ?? 0 : data?.rating ?? 4.3;
+  const rating = data?.rating || 0;
+  const ratingCount = data?.ratingCount || 0;
   const type = data?.foodType || data?.type || data?.category || "Item";
   const price = data?.price;
   const isVeg = String(type).toLowerCase() === "veg";
@@ -64,7 +65,7 @@ const FoodCard = ({ data, onQuantityChange }) => {
         </span>
 
         <span className="absolute top-2 right-2 bg-green-600 text-white text-xs font-semibold px-2 py-1 rounded-full">
-          ★ {rating}
+          ★ {rating > 0 ? rating.toFixed(1) : "New"} {ratingCount > 0 ? `(${ratingCount})` : ""}
         </span>
 
         <span className="absolute bottom-2 left-2 bg-white/90 backdrop-blur text-xs font-semibold px-2 py-1 rounded-full flex items-center gap-1">

@@ -14,8 +14,6 @@ const useGetItemsByCity = () => {
             try {
                 const result = await axios.get(`${serverURL}/api/item/by-city/${encodeURIComponent(currentCity)}`)
                 dispatch(setItemsInMyCity(result.data.items));
-                //i did changes here if problem comes review this 
-                console.log("items from that city", result.data.items);
             } catch (err) {
                 console.log("getmyItemByCity err - ",err);
             }
