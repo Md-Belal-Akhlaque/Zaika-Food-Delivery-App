@@ -15,11 +15,13 @@ import EditItem from './pages/EditItem';
 import useGetShopByCity from './hooks/useGetShopByCity';
 import useGetItemsByCity from './hooks/useGetItemsByCity';
 import useGetMyOrders from './hooks/useGetMyOrders';
+// import useUpdateLocation from "./hooks/useUpdateLocation";
 import CartPage from "./pages/CartPage";
 import CheckOut from "./pages/CheckOut";
 import Payment from "./pages/Payment";
 import MyOrders from "./pages/MyOrders";
 import RateOrder from "./pages/RateOrder";
+import TrackOrder from "./pages/TrackOrder";
 //dispatch ka use karke state ke under data ko daala tha 
 //selector ka use karke state ka slice dhundenge aur wo perticular state ho lekar show karenge
 export const serverURL = "http://localhost:8000"
@@ -31,6 +33,9 @@ function App() {
   const userData = useSelector(state => state.user.userData);
   const dispatch = useDispatch();
   // Hydrate cart BEFORE other effects dispatch
+  // if(userData.user.role ==="deliveryPartner"){
+  //   useUpdateLocation();
+  // }
   useEffect(() => {
     try {
       const userId = userData?._id || userData?.id;
@@ -82,6 +87,7 @@ function App() {
   useGetCurrentUser();
   useGetCity();
   useGetMyOrders();
+  
 
   return (
     <Routes>
@@ -97,8 +103,7 @@ function App() {
       <Route path ="/payment" element={userData ? <Payment /> : <Navigate to="/signin" />} />
       <Route path ="/my-orders" element={userData ? <MyOrders /> : <Navigate to="/signin" />} />
       <Route path ="/rate-order" element={userData ? <RateOrder /> : <Navigate to="/signin" />} />
-
-
+      <Route path ="/track-order/:orderId" element={userData ? <TrackOrder /> : <Navigate to="/signin" />} />
     </Routes>
   );
 }

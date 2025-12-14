@@ -88,7 +88,7 @@ const SignUp = () => {
         );
 
         //this is important 4:54:59
-        dispatch(setUserData(res.data));
+        dispatch(setUserData(res.data.user));
 
         // On success, clear errors and stop loading
         setErrors({});

@@ -91,7 +91,7 @@ const CartPage = () => {
           ) : (
             <div className="mt-6 grid gap-4 sm:grid-cols-1">
               {cartItems.map((item, idx) => (
-                <CartItemCard key={(item.id ?? item._id) || idx} item={item} />
+                <CartItemCard key={item.cartId || (item.id ?? item._id) || idx} item={item} />
               ))}
             </div>
           )}

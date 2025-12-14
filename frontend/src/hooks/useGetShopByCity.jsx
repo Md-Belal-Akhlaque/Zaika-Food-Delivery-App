@@ -12,8 +12,8 @@ const useGetShopByCity = () => {
         if (!currentCity) return;
         const fetchCityShop = async () => {
             try {
-                const result = await axios.get(`${serverURL}/api/shop/getShopByCity/${encodeURIComponent(currentCity)}`)
-                dispatch(setShopsInMyCity(result.data));
+                const result = await axios.get(`${serverURL}/api/shop/city/${encodeURIComponent(currentCity)}`)
+                dispatch(setShopsInMyCity(result.data.shops));
                 console.log("shops in city: " , result.data.shops);
             } catch (err) {
                 console.log("getmyShopByCity err - ",err);

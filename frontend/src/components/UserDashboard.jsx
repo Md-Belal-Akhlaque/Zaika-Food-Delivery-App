@@ -106,7 +106,7 @@ const UserDashboard = () => {
       try {
         setLoadingShops(true);
         setShopsError("");
-        const res = await axios.get(`${serverURL}/api/shop/getShopByCity/${encodeURIComponent(currentCity)}`);
+        const res = await axios.get(`${serverURL}/api/shop/city/${encodeURIComponent(currentCity)}`);
         setShops(res.data?.shops || []);
       } catch (err) {
         setShopsError("Unable to load restaurants");

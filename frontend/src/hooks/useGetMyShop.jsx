@@ -10,8 +10,9 @@ const useGetMyShop = () => {
     useEffect(() => {
         const fetchShop = async () => {
             try {
-                const result = await axios.get(`${serverURL}/api/shop/getShopByOwner`, { withCredentials: true })
+                const result = await axios.get(`${serverURL}/api/shop/me`, { withCredentials: true })
                 dispatch(setMyShopData(result.data));
+                console.log("myshop",result.data);
             } catch (err) {
                 console.log("getmyShop err - ",err);
             }

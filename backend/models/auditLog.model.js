@@ -5,37 +5,44 @@ const auditLogSchema = new mongoose.Schema(
     action: {
       type: String,
       required: true,
-      enum: ["CREATE", "UPDATE", "DELETE"],
+      enum: ["CREATE", "UPDATE", "DELETE", "LOGIN", "ERROR", "SYSTEM"],
     },
+
     entity: {
       type: String,
-      required: true,
-      enum: ["SHOP", "ITEM"],
+      required: false,
+      default: null,
     },
+
     entityId: {
       type: String,
-      required: true,
+      required: false,
+      default: null,  // IMPORTANT FIX
     },
+
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      required: false,
+    },
+
+    status: {
+      type: String,
+      enum: ["SUCCESS", "FAILURE"],
       required: true,
     },
+
     details: {
       type: Object,
       default: {},
     },
-    status: {
-      type: String,
-      enum: ["SUCCESS", "FAILURE"],
-      default: "SUCCESS",
-    },
+
     errorMessage: {
       type: String,
+      default: null,
     },
   },
   { timestamps: true }
 );
 
-const AuditLog = mongoose.model("AuditLog", auditLogSchema);
-export default AuditLog;
+export default mongoose.model("AuditLog", auditLogSchema);

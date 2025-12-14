@@ -1,52 +1,64 @@
-import mongoose from "mongoose"
+import mongoose from "mongoose";
 
-const shopSchema = new mongoose.Schema({
-    name:{
-        type:String,
-        required:true
-    },
-    image:{
-        type:String,
-        required:true
-    },
-    owner:{
-        //type jo hoga owner wo to login signup ke time hi to hoga means user login kara hai jis tarah wo owner hai 
-        type:mongoose.Schema.Types.ObjectId,
-        //ye userModel ko refrence kar rha hai
-        ref:"User",
-        required:true
-    },
-    city:{
-        type:String,
-        required:true
-    },
-    state:{
-        type:String,
-        required:true
-    },
-    address:{
-        type:String,
-        required:true
-    },//from here items ka data store likna hai
-    //ek shop multiple items bana sakti hai 
-    //jo img ham upload karte hai wo pahle aati hai backend me phir multer middleware ke thorugh aage badta hai public folder me jo img rahega wo multer apne paas rakhe ga phir ham usko cloudinary par upload kar denge 
-    //cloudinary us img ka url string bana kar hame dega phir ham aage ki chize karenge save to database
-    
+/*
+  FINAL Shop Schema - production friendly
+*/
+const shopSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true, trim: true },
 
-    items:[{
+    // URL to image (cloudinary) shown to users
+    image: { type: String, required: false, default: null },
+
+    // Cloudinary public id so we can delete the image later
+    imagePublicId: { type: String, required: false, default: null },
+
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+
+    city: { type: String, required: true, trim: true },
+    state: { type: String, required: true, trim: true },
+    address: { type: String, required: true, trim: true },
+
+    // Items (references)
+    items: [
+      {
         type: mongoose.Schema.Types.ObjectId,
-        ref:"Item",
-    }],
-    rating: {
-        type: Number,
-        default: 0
-    },
-    ratingCount: {
-        type: Number,
-        default: 0
-    }
-},{timestamps:true})  
+        ref: "Item"
+      }
+    ],
 
-const Shop = mongoose.model("Shop",shopSchema)
+    // Ratings
+    rating: { type: Number, default: 0 },
+    ratingCount: { type: Number, default: 0 },
 
+    // Business / UX fields
+    isOpen: { type: Boolean, default: true },               // open/closed
+    isActive: { type: Boolean, default: true },             // soft delete
+    isDeliveryAvailable: { type: Boolean, default: true },  // delivery on/off
+
+    // Optional metadata
+    shopType: [{ type: String, trim: true }],               // tags e.g. ["North Indian","Bakery"]
+    description: { type: String, trim: true, default: "" },
+
+    // Geo (optional, useful later)
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
+
+    // Times (minutes)
+    prepTime: { type: Number, default: 15 },     // typical preparation time
+    deliveryTime: { type: Number, default: 30 }  // expected delivery time
+  },
+  { timestamps: true }
+);
+
+// Indexes for common queries
+shopSchema.index({ city: 1 });
+shopSchema.index({ owner: 1 });
+shopSchema.index({ isActive: 1 });
+
+const Shop = mongoose.model("Shop", shopSchema);
 export default Shop;

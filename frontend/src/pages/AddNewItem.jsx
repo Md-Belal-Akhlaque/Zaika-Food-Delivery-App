@@ -2,252 +2,364 @@ import React, { useState } from "react";
 import axios from "axios";
 import { IoIosArrowRoundBack } from "react-icons/io";
 import { useNavigate } from "react-router-dom";
-import { useSelector, useDispatch } from "react-redux";
-import { FaUtensils } from "react-icons/fa6";
+import { useDispatch } from "react-redux";
+import { FaUtensils, FaPlus, FaTrash } from "react-icons/fa6";
 import { serverURL } from "../App";
-import { setMyShopItems,setMyShopData } from "../redux/ownerSlice";
+import { setMyShopItems, setMyShopData } from "../redux/ownerSlice";
 import { ClipLoader } from "react-spinners";
-
-
 
 const AddNewItem = () => {
 
     const dispatch = useDispatch();
     const navigate = useNavigate();
-    const { myShopItem } = useSelector((state) => state.owner);
-    // const { myShopData } = useSelector((state) => state.owner);
-
+    
+    // Categories matching backend
     const categories = [
-        "Snacks",
+        "Starters",
         "Main Course",
         "Desserts",
         "Pizza",
         "Burger",
-        "Sandwitches",
-        "South Indian",
+        "Sandwiches",
         "North Indian",
+        "South Indian",
         "Chinese",
-        "Fast Food",
-        "Others"];
+        "Street Food",
+        "Beverages",
+        "Others"
+    ];
 
-
-    // form states
-    //yaha par .shop isiliye kara hai becoz backend se data ownerSlice me success and shop json me aya hai to ownerslice me shop me name ko access kar rahe hai 
-    const [itemName, setItemName] = useState(myShopItem?.name || "");
-    const [description, setDescription] = useState(myShopItem?.description || "");
+    // Form states
+    const [itemName, setItemName] = useState("");
+    const [description, setDescription] = useState("");
     const [foodType, setFoodType] = useState("veg");
-    const [category, setCategory] = useState(myShopItem?.category || "Restaurant");
-    const [price, setPrice] = useState(myShopItem?.price || "");
-    const [image, setImage] = useState(myShopItem?.image || "");
-    const [previewImage, setPreviewImage] = useState(myShopItem?.image || "");
+    const [category, setCategory] = useState("Others");
+    const [price, setPrice] = useState("");
+    const [discountPrice, setDiscountPrice] = useState("");
+    const [prepTime, setPrepTime] = useState(10);
+    
+    // Dynamic lists
+    const [variants, setVariants] = useState([]);
+    const [addons, setAddons] = useState([]);
+
+    const [image, setImage] = useState(null);
+    const [previewImage, setPreviewImage] = useState("");
     const [loading, setLoading] = useState(false);
 
     const handleImage = (e) => {
         const file = e.target.files[0];
-        setImage(file);
-        setPreviewImage(URL.createObjectURL(file)); //frontend img ka url ban gaya hai 
+        if (file) {
+            setImage(file);
+            setPreviewImage(URL.createObjectURL(file));
+        }
+    };
+
+    // Variant Handlers
+    const addVariant = () => {
+        setVariants([...variants, { name: "", price: "" }]);
+    };
+
+    const removeVariant = (index) => {
+        const newVariants = variants.filter((_, i) => i !== index);
+        setVariants(newVariants);
+    };
+
+    const handleVariantChange = (index, field, value) => {
+        const newVariants = [...variants];
+        newVariants[index][field] = value;
+        setVariants(newVariants);
+    };
+
+    // Addon Handlers
+    const addAddon = () => {
+        setAddons([...addons, { title: "", price: "" }]);
+    };
+
+    const removeAddon = (index) => {
+        const newAddons = addons.filter((_, i) => i !== index);
+        setAddons(newAddons);
+    };
+
+    const handleAddonChange = (index, field, value) => {
+        const newAddons = [...addons];
+        newAddons[index][field] = value;
+        setAddons(newAddons);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         try {
-            //ye ek class hoti hai 
             const formData = new FormData();
 
-            formData.append("name", itemName)
+            formData.append("name", itemName);
             if (image) {
-                formData.append("image", image)
+                formData.append("image", image);
             }
-            formData.append("price", price)
-            formData.append("description", description)
-            formData.append("category", category)
-            formData.append("foodType", foodType)
+            formData.append("price", price);
+            formData.append("discountPrice", discountPrice);
+            formData.append("description", description);
+            formData.append("category", category);
+            formData.append("foodType", foodType);
+            formData.append("prepTime", prepTime);
+            // formData.append("isAvailable", isAvailable); // Backend default is true, usually not needed on create unless false
 
-              const response = await axios.post(`${serverURL}/api/item/add-item`,formData,{withCredentials:true});
+            // Append JSON strings for complex arrays
+            formData.append("variants", JSON.stringify(variants));
+            formData.append("addons", JSON.stringify(addons));
 
+            const response = await axios.post(`${serverURL}/api/item/add-item`, formData, { withCredentials: true });
+
+            if(response.data.shop) dispatch(setMyShopData(response.data.shop));
+            // Assuming the backend returns the updated item list or we need to refetch?
+            // The controller returns: { success: true, message: "...", shop } 
+            // And shop is populated with items.
+            if(response.data.shop && response.data.shop.items) {
+                dispatch(setMyShopItems(response.data.shop.items));
+            }
             
-              dispatch(setMyShopData(response.data.shop));
-              dispatch(setMyShopItems(response.data.item));
-              console.log("FORM SUBMITTED:", response.data);
-              setLoading(false);
-              navigate("/");
+            console.log("FORM SUBMITTED:", response.data);
+            setLoading(false);
+            navigate("/");
 
         } catch (error) {
             console.log("AXIOS ERROR RAW =>", error);
-            console.log("FORM DATA ERROR =>", error?.response?.data?.error);  //ye specific error show karta hai 
+            console.log("FORM DATA ERROR =>", error?.response?.data?.error);
             console.log("MESSAGE =>", error?.response?.data?.message);
             setLoading(false);
         }
     };
 
-
-
-
     return (
-        <div className="flex justify-center flex-col items-center p-6 bg-gradient-to-br 
-                  from-orange-50 to-white min-h-screen relative">
+        <div className="flex justify-center flex-col items-center p-6 bg-gradient-to-br from-orange-50 to-white min-h-screen relative">
 
             {/* Back Button */}
-            <div className="absolute top-6 left-6 text-3xl text-orange-500 drop-shadow-md">
+            <div className="absolute top-6 left-6 text-3xl text-orange-500 drop-shadow-md z-10">
                 <IoIosArrowRoundBack
                     size={38}
-                    className="border bg-white p-1 rounded-2xl shadow hover:text-[#ff4d2d] 
-                   cursor-pointer transition"
+                    className="border bg-white p-1 rounded-2xl shadow hover:text-[#ff4d2d] cursor-pointer transition"
                     onClick={() => navigate("/")}
                 />
             </div>
 
             {/* Container */}
-            <div className="max-w-xl w-full bg-white/90 backdrop-blur-md shadow-xl rounded-3xl 
-                    p-10 border border-orange-200 hover:shadow-2xl transition-all">
+            <div className="max-w-3xl w-full bg-white/90 backdrop-blur-md shadow-xl rounded-3xl p-10 border border-orange-200 transition-all">
 
                 {/* Heading */}
                 <div className="flex flex-col items-center mb-8">
                     <div className="bg-orange-100 p-4 rounded-full shadow-inner">
-                        <FaUtensils className="text-[#ff4d2d] w-16 h-16" />
+                        <FaUtensils className="text-[#ff4d2d] w-12 h-12" />
                     </div>
-
                     <div className="text-3xl font-extrabold text-gray-900 mt-4">
-                        {myShopItem ? "Edit Item" : "Create New Item"}
+                        Create New Item
                     </div>
-
                     <p className="text-gray-500 text-sm">
-                        Add delicious food items to attract customers 
+                        Add delicious food items to attract customers
                     </p>
                 </div>
 
                 {/* FORM */}
-                <form onSubmit={handleSubmit}>
+                <form onSubmit={handleSubmit} className="space-y-6">
 
-                    {/* Name */}
-                    <div className="mb-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Item Name
-                        </label>
-                        <input
-                            type="text"
-                            className="w-full border px-3 py-3 rounded-lg bg-white shadow-sm
-                       focus:outline-[#ff4d2d] placeholder:text-gray-400"
-                            placeholder="Enter item name"
-                            value={itemName}
-                            onChange={(e) => setItemName(e.target.value)}
-                            required
-                        />
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                            <input
+                                type="text"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="e.g. Butter Chicken"
+                                value={itemName}
+                                onChange={(e) => setItemName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                            <select
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                            >
+                                {categories.map((cat) => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
 
-                    {/* Image */}
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Food Image
-                        </label>
-
-                        <div className="flex items-center gap-4">
-                            <label className="cursor-pointer px-4 py-2 bg-orange-100 border 
-                               border-orange-300 rounded-lg shadow hover:bg-orange-200 
-                               transition text-[#ff4d2d] font-medium">
-                                Choose Image
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImage}
-                                    className="hidden"
-                                />
-                            </label>
-
-                            <span className="text-gray-500 text-sm">
-                                {image?.name || "No file chosen"}
-                            </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Food Type</label>
+                             <div className="flex gap-4 mt-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="foodType" 
+                                        value="veg"
+                                        checked={foodType === "veg"}
+                                        onChange={(e) => setFoodType(e.target.value)}
+                                        className="accent-green-600"
+                                    />
+                                    <span className="text-green-700 font-medium">Veg</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="foodType" 
+                                        value="non-veg"
+                                        checked={foodType === "non-veg"}
+                                        onChange={(e) => setFoodType(e.target.value)}
+                                        className="accent-red-600"
+                                    />
+                                    <span className="text-red-700 font-medium">Non-Veg</span>
+                                </label>
+                             </div>
                         </div>
 
-                        {/* Preview */}
-                        {previewImage && (
-                            <img
-                                src={previewImage}
-                                alt="preview"
-                                className="w-full h-52 object-cover rounded-xl mt-4 shadow-md border"
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Prep Time (mins)</label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="10"
+                                value={prepTime}
+                                onChange={(e) => setPrepTime(e.target.value)}
+                                min="0"
                             />
-                        )}
+                        </div>
                     </div>
 
-                    {/* Price */}
-                    <div className="mb-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Price (₹)
-                        </label>
-                        <input
-                            type="number"
-                            className="w-full border px-3 py-3 rounded-lg shadow-sm 
-                       focus:outline-[#ff4d2d]"
-                            placeholder="Enter price"
-                            value={price}
-                            onChange={(e) => setPrice(e.target.value)}
-                            required
-                        />
+                    {/* Pricing */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="0"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                required
+                                min="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Discount Price (₹) <span className="text-gray-400 text-xs">(Optional)</span></label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="0"
+                                value={discountPrice}
+                                onChange={(e) => setDiscountPrice(e.target.value)}
+                                min="0"
+                            />
+                        </div>
                     </div>
 
                     {/* Description */}
-                    <div className="mb-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Description
-                        </label>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
                         <textarea
-                            className="w-full border px-3 py-3 rounded-lg shadow-sm 
-                       focus:outline-[#ff4d2d]"
-                            placeholder="Write something about this item..."
+                            className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                            placeholder="Describe the item..."
                             rows="3"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                        ></textarea>
+                        />
                     </div>
 
-                    {/* category */}
-                    <div className="mb-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Category
-                        </label>
-                        <select
-                            className="w-full border px-3 py-3 rounded-lg shadow-sm focus:outline-[#ff4d2d]"
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                        >
-                            <option value="">Select Category</option>
-                            {categories.map((cat, index) => (
-                                <option key={index} value={cat}>
-                                    {cat}
-                                </option>
-                            ))}
-                        </select>
+                    {/* Image Upload */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Item Image</label>
+                        <div className="flex items-start gap-4">
+                            <label className="cursor-pointer px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-[#ff4d2d] transition text-sm font-medium">
+                                Upload Image
+                                <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                            </label>
+                            {previewImage && (
+                                <img src={previewImage} alt="preview" className="w-24 h-24 object-cover rounded-lg border shadow-sm" />
+                            )}
+                        </div>
                     </div>
 
-                    {/* Food Type */}
-                    <div className="mb-5">
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Food Type
-                        </label>
-                        <select
-                            className="w-full border px-3 py-3 rounded-lg shadow-sm focus:outline-[#ff4d2d]"
-                            value={foodType}
-                            onChange={(e) => setFoodType(e.target.value)}
-                        >
-                            <option>Veg</option>
-                            <option>Non-Veg</option>
-                        </select>
+                    {/* Variants Section */}
+                    <div className="border-t pt-4">
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-bold text-gray-700">Variants <span className="font-normal text-gray-500">(e.g. Small, Large)</span></label>
+                            <button type="button" onClick={addVariant} className="text-xs flex items-center gap-1 text-[#ff4d2d] hover:underline font-semibold">
+                                <FaPlus /> Add Variant
+                            </button>
+                        </div>
+                        
+                        {variants.map((variant, index) => (
+                            <div key={index} className="flex gap-3 mb-2 items-center">
+                                <input
+                                    type="text"
+                                    placeholder="Variant Name"
+                                    className="flex-1 border px-3 py-2 rounded-lg text-sm focus:outline-[#ff4d2d]"
+                                    value={variant.name}
+                                    onChange={(e) => handleVariantChange(index, "name", e.target.value)}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Price"
+                                    className="w-24 border px-3 py-2 rounded-lg text-sm focus:outline-[#ff4d2d]"
+                                    value={variant.price}
+                                    onChange={(e) => handleVariantChange(index, "price", e.target.value)}
+                                />
+                                <button type="button" onClick={() => removeVariant(index)} className="text-red-500 hover:text-red-700">
+                                    <FaTrash size={14} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Addons Section */}
+                    <div className="border-t pt-4">
+                         <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-bold text-gray-700">Add-ons <span className="font-normal text-gray-500">(e.g. Extra Cheese)</span></label>
+                            <button type="button" onClick={addAddon} className="text-xs flex items-center gap-1 text-[#ff4d2d] hover:underline font-semibold">
+                                <FaPlus /> Add Add-on
+                            </button>
+                        </div>
+                        
+                        {addons.map((addon, index) => (
+                            <div key={index} className="flex gap-3 mb-2 items-center">
+                                <input
+                                    type="text"
+                                    placeholder="Addon Title"
+                                    className="flex-1 border px-3 py-2 rounded-lg text-sm focus:outline-[#ff4d2d]"
+                                    value={addon.title}
+                                    onChange={(e) => handleAddonChange(index, "title", e.target.value)}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Price"
+                                    className="w-24 border px-3 py-2 rounded-lg text-sm focus:outline-[#ff4d2d]"
+                                    value={addon.price}
+                                    onChange={(e) => handleAddonChange(index, "price", e.target.value)}
+                                />
+                                <button type="button" onClick={() => removeAddon(index)} className="text-red-500 hover:text-red-700">
+                                    <FaTrash size={14} />
+                                </button>
+                            </div>
+                        ))}
                     </div>
 
                     {/* Submit */}
                     <button
                         type="submit"
-                        className="w-full py-3 bg-[#ff4d2d] text-white font-semibold rounded-xl 
-                     shadow-md hover:bg-[#e84224] hover:shadow-lg transition-all duration-300"
+                        className="w-full py-3 bg-[#ff4d2d] text-white font-bold rounded-lg hover:bg-orange-600 transition duration-300 shadow-md mt-6"
+                        disabled={loading}
                     >
-                        {loading?<ClipLoader size={25} color="white"/>:(myShopItem ? "Update Item" : "Create Item")}
+                        {loading ? <ClipLoader size={20} color="white" /> : "Create Item"}
                     </button>
                 </form>
             </div>
         </div>
     );
-
 };
 
 export default AddNewItem;

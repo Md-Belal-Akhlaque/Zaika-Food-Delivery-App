@@ -1,13 +1,17 @@
 import express from "express";
 import { isAuth } from "../middleware/isAuth.js";
-import { placeOrder , getMyOrders } from "../controllers/order.controller.js";
+import {
+  createOrder,
+  getMyOrders,
+  getOwnerOrders,
+  updateShopOrderStatus
+} from "../controllers/order.controller.js";
 
+const router = express.Router();
 
+router.post("/create", isAuth, createOrder);
+router.get("/my-orders", isAuth, getMyOrders);
+router.get("/owner-orders", isAuth, getOwnerOrders);
+router.patch("/update-status", isAuth, updateShopOrderStatus);
 
-const orderRouter = express.Router();
-
-orderRouter.post("/place-order",isAuth,placeOrder);
-orderRouter.get("/my-orders",isAuth,getMyOrders);
-
-
-export default orderRouter;
+export default router;

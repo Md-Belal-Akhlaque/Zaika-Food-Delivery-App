@@ -38,7 +38,7 @@ const OwnerNavbar = () => {
         {/* Left: Brand / Logo */}
         <div
           className="flex items-center gap-2 cursor-pointer"
-          onClick={() => navigate("/OwnerDashboard")}
+          onClick={() => navigate("/")}
         >
           <FaStore size={26} className="text-[#ff4d2d]" />
           <div className="flex flex-col leading-tight">
@@ -55,7 +55,7 @@ const OwnerNavbar = () => {
         <div className="hidden md:flex items-center gap-4 text-gray-700 text-sm font-medium">
           {/* Orders */}
           <button
-            onClick={() => navigate("/owner/orders")}
+            onClick={() => navigate("/my-orders")}
             className="relative flex items-center gap-2 bg-white px-3 py-2 rounded-xl shadow border border-gray-200 hover:bg-gray-100"
           >
             <FaClipboardList size={18} className="text-gray-700" />
@@ -141,6 +141,12 @@ const OwnerNavbar = () => {
                 </p>
               </div>
 
+              <button
+                onClick={() => navigate("/my-orders")}
+                className="w-full text-left py-2 px-2 rounded-lg hover:bg-gray-100"
+              >
+                MyOrders
+              </button>
               <button
                 onClick={() => navigate("/owner/profile")}
                 className="w-full text-left py-2 px-2 rounded-lg hover:bg-gray-100"

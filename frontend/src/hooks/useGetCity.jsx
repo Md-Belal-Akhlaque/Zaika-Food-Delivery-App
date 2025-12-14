@@ -1,3 +1,5 @@
+// useGetCity.jsx
+
 import { useEffect } from "react";
 import axios from "axios";
 import { useDispatch, useSelector } from "react-redux";
@@ -6,7 +8,7 @@ import {
   setCurrentState,
   setCurrentAddress
 } from "../redux/userSlice";
-import {setLocation , setAddress} from "../redux/mapSlice";
+import { setLocation, setAddress } from "../redux/mapSlice";
 
 const useGetCity = () => {
   const dispatch = useDispatch();
@@ -16,56 +18,91 @@ const useGetCity = () => {
   useEffect(() => {
     if (!apiKey || !userData) return;
 
-    const success = async (position) => {
+    // 🟢 SUCCESS HANDLER
+    const onSuccess = async (position) => {
       try {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
-
-        // console.log("LAT / LON =>", lat, lon);
 
         const { data } = await axios.get(
           `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`
         );
 
-        const props = data?.features?.[0]?.properties;
+        const props = data?.features?.[0]?.properties || {};
 
-        const city = props?.city || props?.town || props?.village;
-        const state = props?.state;
+        const city =
+          props.city || props.town || props.village || props.county || "Unknown City";
+
+        const state = props.state || "Unknown State";
+
         const address =
-          props?.formatted ||
-          props?.address_line1 ||
-          props?.street ||
-          "Unknown";
+          props.formatted || props.address_line1 || props.street || "Unknown Address";
+
+        // Update Redux
+        dispatch(setCurrentCity(city));
+        dispatch(setCurrentState(state));
+        dispatch(setCurrentAddress(address));
+
+        dispatch(setLocation({ lat, lon }));
+        dispatch(setAddress(address));
+
+        console.log("📍 GPS City:", city);
+      } catch (err) {
+        console.log("❌ Reverse Geo API Error:", err);
+      }
+    };
+
+    // 🔄 FALLBACK: IP BASED LOCATION
+    const fetchIPLocation = async () => {
+      try {
+        console.log("🌐 Using IP-based location fallback...");
+
+        const { data } = await axios.get("https://ipapi.co/json/");
+
+        const city = data.city || "Unknown City";
+        const state = data.region || "Unknown State";
+        const address = `${data.city}, ${data.region}, ${data.country_name}`;
 
         dispatch(setCurrentCity(city));
         dispatch(setCurrentState(state));
         dispatch(setCurrentAddress(address));
-          // these below will be used in mapSlice 
-        dispatch(setLocation({ lat, lon }));
+
+        dispatch(setLocation({ lat: data.latitude, lon: data.longitude }));
         dispatch(setAddress(address));
 
-        
-
-        console.log("CITY ===> ", city);
-        console.log("STATE ===> ", state);
-        console.log("ADDRESS ===> ", address);
+        console.log("📍 IP Location Used:", city);
       } catch (err) {
-        console.log("API ERROR =>", err);
+        console.log("❌ IP Location Failed:", err);
       }
     };
 
-    const error = (err) => {
-      if (err.code === 1) console.log("User denied location ❌");
-      if (err.code === 2) console.log("Position unavailable 🔄");
-      if (err.code === 3) console.log("Request timeout ⏳");
+    // 🔴 ERROR HANDLER
+    const onError = (err) => {
+      console.warn(`⚠️ Location Error (${err.code}): ${err.message}`);
 
-      console.log("location err - ", err);
+      switch (err.code) {
+        case 1:
+          console.log("❌ User denied location");
+          break;
+        case 2:
+          console.log("🔄 Position unavailable");
+          break;
+        case 3:
+          console.log("⏳ GPS Timeout");
+          break;
+        default:
+          console.log("❌ Unknown location error");
+      }
+
+      // Fallback always
+      fetchIPLocation();
     };
 
-    navigator.geolocation.getCurrentPosition(success, error, {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
+    // 📌 REQUEST GEOLOCATION
+    navigator.geolocation.getCurrentPosition(onSuccess, onError, {
+      enableHighAccuracy: false, // Faster, avoids timeout
+      timeout: 20000,            // Increased timeout
+      maximumAge: 5000,
     });
   }, [userData, apiKey, dispatch]);
 };

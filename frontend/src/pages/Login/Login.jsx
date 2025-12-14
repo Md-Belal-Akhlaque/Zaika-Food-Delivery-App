@@ -66,7 +66,7 @@ const Login = () => {
     console.log(res.data.message);
 
     //dispatch imp redux toolkit things 4:55:48
-    dispatch(setUserData(res.data));
+    dispatch(setUserData(res.data.user));
     
     navigate("/");  // Correct usage here
 

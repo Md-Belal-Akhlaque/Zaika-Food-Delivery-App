@@ -1,13 +1,32 @@
 import express from "express";
 import { isAuth } from "../middleware/isAuth.js";
-import { createEditShop, getShopByOwner ,getShopByCity } from "../controllers/shop.controller.js";
 import { upload } from "../middleware/multer.js";
 
-const shopRouter = express.Router();
+import {
+  createShop,
+  editShop,
+  getMyShop,
+  getShopsByCity,
+  getShopById,
+  toggleOpen,
+  toggleDelivery,
+  deleteShop
+} from "../controllers/shop.controller.js";
 
-//isAuth middleware lagaya taki sirf authenticated user hi shop create ya edit kar paye aur userId le paye 
-shopRouter.post("/create-edit",isAuth,upload.single("image"),createEditShop);
-shopRouter.get("/getShopByOwner",isAuth,getShopByOwner); 
-shopRouter.get("/getShopByCity/:city",getShopByCity); 
+const router = express.Router();
+router.post("/", isAuth, upload.single("image"), createShop);
 
-export default shopRouter;
+router.get("/me", isAuth, getMyShop);
+router.get("/city/:city", getShopsByCity);
+
+router.put("/:shopId", isAuth, upload.single("image"), editShop);
+
+router.patch("/:id/open", isAuth, toggleOpen);
+router.patch("/:id/delivery", isAuth, toggleDelivery);
+
+router.delete("/:id", isAuth, deleteShop);
+
+// FINAL CATCH ROUTE — must be last
+router.get("/:id", getShopById);
+
+export default router;

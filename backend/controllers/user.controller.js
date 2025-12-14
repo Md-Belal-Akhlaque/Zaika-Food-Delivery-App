@@ -2,6 +2,7 @@ import dotenv from "dotenv";
 dotenv.config();
 // Yaha par User model import kar rahe hai jisse hum database (MongoDB) me user ko find kar sake
 import User from "../models/userModel.js";
+import axios from "axios";
 
 // Ye controller function current logged-in user ka data return karta hai
 export const getCurrentUser = async (req, res) => {
@@ -115,5 +116,26 @@ export const deleteAddress = async (req, res) => {
   } catch (error) {
     console.error("Delete Address Error:", error);
     return res.status(500).json({ message: "Error deleting address", error });
+  }
+};
+
+export const updateLocation = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const { lat, lon } = req.body;
+
+    if (!userId) return res.status(400).json({ message: "User ID not found" });
+
+    await User.findByIdAndUpdate(userId, {
+      location: {
+        type: "Point",
+        coordinates: [lon, lat] // MongoDB expects [longitude, latitude]
+      }
+    },{new:true});
+
+    return res.status(200).json({ success: true, message: "Location updated" });
+  } catch (error) {
+    console.error("Update Location Error:", error);
+    return res.status(500).json({ message: "Error updating location", error });
   }
 };

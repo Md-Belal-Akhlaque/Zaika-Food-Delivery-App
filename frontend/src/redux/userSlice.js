@@ -62,24 +62,35 @@ const userSlice = createSlice({
       
       if (!id) return;
       
+      const generateCartId = (item) => {
+        const parts = [item.id || item._id];
+        if (item.variants && item.variants.length) parts.push(JSON.stringify(item.variants));
+        if (item.addons && item.addons.length) parts.push(JSON.stringify(item.addons));
+        return parts.join('_');
+      };
+
+      const cartId = payload.cartId || generateCartId(payload);
       const qtyDelta = Number(payload.quantity ?? 1);
       const next = [];
       let found = false;
       
       for (const item of state.cartItems) {
-        if (item.id === id || item._id === id) {
+        const itemCartId = item.cartId || generateCartId(item);
+
+        if (itemCartId === cartId) {
           found = true;
           const updatedQty = Number(item.quantity || 0) + qtyDelta;
           if (updatedQty > 0) {
             next.push({ 
-              ...item, 
+              ...item,
+              cartId: itemCartId, 
               quantity: updatedQty,
-              //  Ensure price is number
               price: Number(item.price || payload.price || 0)
             });
           }
         } else {
-          next.push(item);
+           if (!item.cartId) item.cartId = itemCartId;
+           next.push(item);
         }
       }
       
@@ -87,6 +98,7 @@ const userSlice = createSlice({
       if (!found && qtyDelta > 0) {
         next.push({
           id,
+          cartId,
           name: payload.name || 'Item',
           price: Number(payload.price || 0),
           image: payload.image,
@@ -94,6 +106,8 @@ const userSlice = createSlice({
           shop: payload.shop,
           category: payload.category,
           quantity: qtyDelta,
+          variants: payload.variants || [],
+          addons: payload.addons || []
         });
       }
       
@@ -103,13 +117,20 @@ const userSlice = createSlice({
     //  FIXED: decreaseCartItem with BETTER logic
     decreaseCartItem: (state, action) => {
       const id = action.payload?.id ?? action.payload?._id;
+      const cartId = action.payload?.cartId;
       const qtyDelta = Number(action.payload?.quantity ?? 1);
       
-      if (!id) return;
+      if (!id && !cartId) return;
       
       const next = state.cartItems
         .map((item) => {
-          if (item.id === id || item._id === id) {
+          const itemCartId = item.cartId || (item.id || item._id); // Fallback for legacy
+          const targetId = cartId || id;
+
+          // If cartId provided, exact match. Else match by ID (careful with variants)
+          const match = cartId ? itemCartId === cartId : (item.id === id || item._id === id);
+
+          if (match) {
             const newQty = Math.max(0, Number(item.quantity || 0) - qtyDelta);
             return { ...item, quantity: newQty };
           }
@@ -128,10 +149,15 @@ const userSlice = createSlice({
     //  NEW: Remove specific item
     removeCartItem: (state, action) => {
       const id = action.payload?.id ?? action.payload?._id;
-      if (!id) return;
+      const cartId = action.payload?.cartId;
+
+      if (!id && !cartId) return;
       
       state.cartItems = state.cartItems.filter(
-        (item) => item.id !== id && item._id !== id
+        (item) => {
+             if (cartId) return item.cartId !== cartId;
+             return item.id !== id && item._id !== id;
+        }
       );
     },
 
@@ -172,13 +198,24 @@ const userSlice = createSlice({
       state.cartItems = Array.isArray(action.payload) ? action.payload : []
     },
  //  CORRECT
+// In your userSlice.js - FIXED setMyOrders reducer
 setMyOrders: (state, action) => {
-  const orders = Array.isArray(action.payload?.orders) 
+  // Handle both direct array and nested response object
+  const orders = action.payload?.orders 
     ? action.payload.orders 
     : Array.isArray(action.payload) 
     ? action.payload 
     : [];
+  
   state.myOrders = orders;
+},
+updateOrderStatus:(state,action) => {
+  const {orderId,shopId,status} = action.payload;
+  const order = state.myOrders.find(o=>o._id ==orderId)
+  if(order){
+    if(order.shopOrders && order.shopOrders.shop._id ==shopId)
+      order.shopOrders.status = status;
+  }
 }
 
   },
@@ -201,6 +238,7 @@ export const {
   deleteAddress,
   setSavedAddresses,
   setMyOrders,
+  updateOrderStatus
 } = userSlice.actions;
 
 export default userSlice.reducer;

@@ -8,6 +8,8 @@ import { setSavedAddresses } from "../redux/userSlice";
 import { setLocation, setAddress } from "../redux/mapSlice";
 import Map from "../components/Map";
 
+import { serverURL } from "../App";
+
 const CheckOut = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
@@ -38,7 +40,7 @@ const CheckOut = () => {
     const fetchAddresses = async () => {
       try {
         setIsFetchingAddresses(true);
-        const { data } = await axios.get("http://localhost:8000/api/user/addresses", {
+        const { data } = await axios.get(`${serverURL}/api/user/addresses`, {
           withCredentials: true,
         });
         
@@ -319,7 +321,10 @@ const CheckOut = () => {
         },
         timeSlot: timeSlots[selectedTimeSlot],
         coupon: appliedCoupon ? { code: couponCode, ...appliedCoupon } : null,
-        cartItems,
+        cartItems: cartItems.map(item => ({
+          ...item,
+          itemId: item.id || item._id
+        })),
       },
     });
   };
@@ -808,22 +813,37 @@ const CheckOut = () => {
                 </h3>
 
                 {/* Cart Items Preview */}
-                <div className="mb-4 max-h-40 overflow-y-auto space-y-2">
-                  {cartItems.slice(0, 3).map((item, idx) => (
-                    <div key={idx} className="flex justify-between text-sm gap-2">
-                      <span className="text-gray-700 truncate">
-                        {item.name} × {item.quantity}
-                      </span>
-                      <span className="font-semibold text-gray-900 flex-shrink-0">
-                        ₹{(item.price * item.quantity).toFixed(2)}
-                      </span>
+                <div className="mb-4 max-h-60 overflow-y-auto space-y-3 pr-2">
+                  {cartItems.map((item, idx) => (
+                    <div key={idx} className="border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                      <div className="flex justify-between text-sm gap-2">
+                        <span className="text-gray-800 font-medium truncate flex-1">
+                          {item.name} <span className="text-gray-500 text-xs">× {item.quantity}</span>
+                        </span>
+                        <span className="font-semibold text-gray-900 flex-shrink-0">
+                          ₹{(item.price * item.quantity).toFixed(2)}
+                        </span>
+                      </div>
+                      
+                      {/* Variants & Addons Display */}
+                      <div className="pl-0 mt-1 space-y-0.5">
+                        {item.variants && item.variants.length > 0 && (
+                            <p className="text-xs text-gray-500 flex items-start gap-1">
+                              <span className="font-semibold text-[10px] uppercase tracking-wider text-orange-600/80 mt-[1px]">Variant:</span>
+                              <span className="truncate">{item.variants[0].name}</span>
+                            </p>
+                        )}
+                        {item.addons && item.addons.length > 0 && (
+                            <p className="text-xs text-gray-500 flex items-start gap-1">
+                              <span className="font-semibold text-[10px] uppercase tracking-wider text-green-600/80 mt-[1px]">Addons:</span>
+                              <span className="truncate">
+                                {item.addons.map(a => a.name).join(", ")}
+                              </span>
+                            </p>
+                        )}
+                      </div>
                     </div>
                   ))}
-                  {cartItems.length > 3 && (
-                    <button className="text-orange-600 text-xs font-semibold hover:underline">
-                      +{cartItems.length - 3} more items
-                    </button>
-                  )}
                 </div>
 
                 <div className="space-y-2 text-sm border-t-2 border-gray-200 pt-4">
