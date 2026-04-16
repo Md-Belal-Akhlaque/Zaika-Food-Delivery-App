@@ -1,0 +1,388 @@
+import React, { useState } from "react";
+import { ArrowLeft, Utensils, Plus, Trash2, Loader2, Image as ImageIcon, IndianRupee, Clock, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { setMyShopItems, setMyShopData } from "../redux/ownerSlice";
+import { useApi } from "../hooks/useApi";
+import { toast } from "sonner";
+import { cn } from "../utility/cn";
+
+const AddNewItem = () => {
+
+    const { request, loading } = useApi();
+    const dispatch = useDispatch();
+    const navigate = useNavigate();
+    
+    // Categories matching backend
+    const categories = [
+        "Starters",
+        "Main Course",
+        "Desserts",
+        "Pizza",
+        "Burger",
+        "Sandwiches",
+        "North Indian",
+        "South Indian",
+        "Chinese",
+        "Street Food",
+        "Beverages",
+        "Others"
+    ];
+
+    // Form states
+    const [itemName, setItemName] = useState("");
+    const [description, setDescription] = useState("");
+    const [foodType, setFoodType] = useState("veg");
+    const [category, setCategory] = useState("Others");
+    const [price, setPrice] = useState("");
+    const [discountPrice, setDiscountPrice] = useState("");
+    const [prepTime, setPrepTime] = useState(10);
+    
+    // Dynamic lists
+    const [variants, setVariants] = useState([]);
+    const [addons, setAddons] = useState([]);
+
+    const [image, setImage] = useState(null);
+    const [previewImage, setPreviewImage] = useState("");
+
+    const handleImage = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setImage(file);
+            setPreviewImage(URL.createObjectURL(file));
+        }
+    };
+
+    // Variant Handlers
+    const addVariant = () => {
+        setVariants([...variants, { name: "", price: "" }]);
+    };
+
+    const removeVariant = (index) => {
+        const newVariants = variants.filter((_, i) => i !== index);
+        setVariants(newVariants);
+    };
+
+    const handleVariantChange = (index, field, value) => {
+        const newVariants = [...variants];
+        newVariants[index][field] = value;
+        setVariants(newVariants);
+    };
+
+    // Addon Handlers
+    const addAddon = () => {
+        setAddons([...addons, { title: "", price: "" }]);
+    };
+
+    const removeAddon = (index) => {
+        const newAddons = addons.filter((_, i) => i !== index);
+        setAddons(newAddons);
+    };
+
+    const handleAddonChange = (index, field, value) => {
+        const newAddons = [...addons];
+        newAddons[index][field] = value;
+        setAddons(newAddons);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        // ADDED: Validate discount price is not greater than actual price
+        if (discountPrice && Number(discountPrice) > Number(price)) {
+            toast.error("Discount price cannot be greater than actual price");
+            return;
+        }
+
+        const formData = new FormData();
+
+        formData.append("name", itemName);
+        if (image) {
+            formData.append("image", image);
+        }
+        formData.append("price", price);
+        formData.append("discountPrice", discountPrice);
+        formData.append("description", description);
+        formData.append("category", category);
+        formData.append("foodType", foodType);
+        formData.append("prepTime", prepTime);
+        // formData.append("isAvailable", isAvailable); // Backend default is true, usually not needed on create unless false
+
+        // Append JSON strings for complex arrays
+        formData.append("variants", JSON.stringify(variants));
+        formData.append("addons", JSON.stringify(addons));
+
+        await request(
+            {
+                url: "/api/item/add-item",
+                method: "post",
+                data: formData,
+                headers: { "Content-Type": "multipart/form-data" }
+            },
+            {
+                loadingMessage: "Creating new item...",
+                successMessage: "Item created successfully!",
+                onSuccess: (data) => {
+                    if (data.shop) dispatch(setMyShopData(data.shop));
+                    if (data.shop && data.shop.items) {
+                        dispatch(setMyShopItems(data.shop.items));
+                    }
+                    navigate("/");
+                }
+            }
+        );
+    };
+
+    return (
+        <div className="flex justify-center flex-col items-center p-6 bg-gradient-to-br from-orange-50 to-white min-h-screen relative">
+
+            {/* Back Button */}
+            <div className="absolute top-6 left-6 text-3xl text-orange-500 drop-shadow-md z-10">
+                <ArrowLeft
+                    size={38}
+                    className="border bg-white p-1 rounded-2xl shadow hover:text-[#ff4d2d] cursor-pointer transition"
+                    onClick={() => navigate("/")}
+                />
+            </div>
+
+            {/* Container */}
+            <div className="max-w-3xl w-full bg-white/90 backdrop-blur-md shadow-xl rounded-3xl p-10 border border-orange-200 transition-all">
+
+                {/* Heading */}
+                <div className="flex flex-col items-center mb-8">
+                    <div className="bg-orange-100 p-4 rounded-full shadow-inner">
+                        <Utensils className="text-[#ff4d2d] w-12 h-12" />
+                    </div>
+                    <div className="text-3xl font-extrabold text-gray-900 mt-4">
+                        Create New Item
+                    </div>
+                    <p className="text-gray-500 text-sm">
+                        Add delicious food items to attract customers
+                    </p>
+                </div>
+
+                {/* FORM */}
+                <form onSubmit={handleSubmit} className="space-y-6">
+
+                    {/* Basic Info */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Item Name</label>
+                            <input
+                                type="text"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="e.g. Butter Chicken"
+                                value={itemName}
+                                onChange={(e) => setItemName(e.target.value)}
+                                required
+                            />
+                        </div>
+                        
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                            <select
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                            >
+                                {categories.map((cat) => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                             <label className="block text-sm font-medium text-gray-700 mb-1">Food Type</label>
+                             <div className="flex gap-4 mt-2">
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="foodType" 
+                                        value="veg"
+                                        checked={foodType === "veg"}
+                                        onChange={(e) => setFoodType(e.target.value)}
+                                        className="accent-green-600"
+                                    />
+                                    <span className="text-green-700 font-medium">Veg</span>
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input 
+                                        type="radio" 
+                                        name="foodType" 
+                                        value="non-veg"
+                                        checked={foodType === "non-veg"}
+                                        onChange={(e) => setFoodType(e.target.value)}
+                                        className="accent-red-600"
+                                    />
+                                    <span className="text-red-700 font-medium">Non-Veg</span>
+                                </label>
+                             </div>
+                        </div>
+
+                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Prep Time (mins)</label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="10"
+                                value={prepTime}
+                                onChange={(e) => setPrepTime(e.target.value)}
+                                min="0"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Pricing */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Price (₹)</label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="0"
+                                value={price}
+                                onChange={(e) => setPrice(e.target.value)}
+                                required
+                                min="0"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Discount Price (₹) <span className="text-gray-400 text-xs">(Optional)</span></label>
+                            <input
+                                type="number"
+                                className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                placeholder="0"
+                                value={discountPrice}
+                                onChange={(e) => setDiscountPrice(e.target.value)}
+                                min="0"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea
+                            className="w-full border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                            placeholder="Describe the item..."
+                            rows="3"
+                            value={description}
+                            onChange={(e) => setDescription(e.target.value)}
+                        />
+                    </div>
+
+                    {/* Image Upload */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Item Image</label>
+                        <div className="flex items-start gap-4">
+                            <label className="cursor-pointer px-4 py-2 bg-orange-50 border border-orange-200 rounded-lg hover:bg-orange-100 text-[#ff4d2d] transition text-sm font-medium">
+                                Upload Image
+                                <input type="file" accept="image/*" onChange={handleImage} className="hidden" />
+                            </label>
+                            {previewImage && (
+                                <img src={previewImage} alt="preview" className="w-24 h-24 object-cover rounded-lg border shadow-sm" />
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Variants Section */}
+                    <div className="bg-gray-50 p-6 rounded-2xl border border-dashed border-gray-300">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-gray-800">Variants <span className="font-normal text-sm text-gray-500">(e.g. Small, Large)</span></h3>
+                            <button
+                                type="button"
+                                onClick={addVariant}
+                                className="text-[#ff4d2d] text-sm font-bold flex items-center gap-1 hover:underline"
+                            >
+                                <Plus size={16} /> Add Variant
+                            </button>
+                        </div>
+
+                        {variants.map((variant, index) => (
+                            <div key={index} className="flex gap-4 items-center mb-2 animate-fadeIn">
+                                <input
+                                    type="text"
+                                    placeholder="Size (e.g. Small)"
+                                    className="flex-1 border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                    value={variant.name}
+                                    onChange={(e) => handleVariantChange(index, "name", e.target.value)}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Price"
+                                    className="w-24 border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                    value={variant.price}
+                                    onChange={(e) => handleVariantChange(index, "price", e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => removeVariant(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Add-ons Section */}
+                    <div className="bg-gray-50 p-6 rounded-2xl border border-dashed border-gray-300">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-gray-800">Add-ons <span className="font-normal text-sm text-gray-500">(e.g. Extra Cheese)</span></h3>
+                            <button
+                                type="button"
+                                onClick={addAddon}
+                                className="text-[#ff4d2d] text-sm font-bold flex items-center gap-1 hover:underline"
+                            >
+                                <Plus size={16} /> Add Add-on
+                            </button>
+                        </div>
+
+                        {addons.map((addon, index) => (
+                            <div key={index} className="flex gap-4 items-center mb-2 animate-fadeIn">
+                                <input
+                                    type="text"
+                                    placeholder="Extra Cheese"
+                                    className="flex-1 border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                    value={addon.title}
+                                    onChange={(e) => handleAddonChange(index, "title", e.target.value)}
+                                />
+                                <input
+                                    type="number"
+                                    placeholder="Price"
+                                    className="w-24 border px-3 py-2 rounded-lg focus:outline-[#ff4d2d]"
+                                    value={addon.price}
+                                    onChange={(e) => handleAddonChange(index, "price", e.target.value)}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => removeAddon(index)}
+                                    className="text-red-500 hover:text-red-700"
+                                >
+                                    <Trash2 size={20} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Submit Button */}
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className={cn(
+                            "w-full bg-[#ff4d2d] text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-[#e84224] transition transform active:scale-95 flex items-center justify-center gap-2 mt-6",
+                            loading && "opacity-70 cursor-not-allowed"
+                        )}
+                    >
+                        {loading ? <Loader2 size={24} className="animate-spin" /> : <Plus size={24} />}
+                        {loading ? "Adding Item..." : "Create Food Item"}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+};
+
+export default AddNewItem;
