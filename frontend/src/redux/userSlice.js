@@ -72,28 +72,28 @@ const userSlice = createSlice({
       state.itemsInMyCity = action.payload;
     },
 
-    // 🔥 CHATGPT CHANGE: Separate setter for USER
+    //  CHATGPT CHANGE: Separate setter for USER
     setUserOrders: (state, action) => {
       state.userOrders = Array.isArray(action.payload) ? action.payload : [];
     },
 
-    // 🔥 CHATGPT CHANGE: Separate setter for OWNER
+    //  CHATGPT CHANGE: Separate setter for OWNER
     setOwnerOrders: (state, action) => {
       state.ownerOrders = Array.isArray(action.payload) ? action.payload : [];
     },
 
-    // 🔥 CHATGPT CHANGE: Safe update for BOTH structures
+    //  CHATGPT CHANGE: Safe update for BOTH structures
     updateOrderStatus: (state, action) => {
       const { orderId, shopOrderId, status } = action.payload;
 
-      // 👉 USER FLOW
+      //  USER FLOW
       const userOrder = state.userOrders?.find(o => o._id == orderId);
       if (userOrder) {
         const so = userOrder.shopOrders?.find(s => s._id == shopOrderId);
         if (so) so.status = status;
       }
 
-      // 👉 OWNER FLOW
+      //  OWNER FLOW
       const ownerOrder = state.ownerOrders?.find(o => o._id == shopOrderId);
       if (ownerOrder) {
         ownerOrder.status = status;
