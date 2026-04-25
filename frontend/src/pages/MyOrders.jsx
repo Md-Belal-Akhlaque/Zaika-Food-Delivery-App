@@ -151,8 +151,7 @@ const MyOrders = () => {
           "N/A",
 
         paymentMethod: shopOrder.order?.paymentMethod,
-        paymentMode:
-          shopOrder.order?.paymentMethod === "online" ? "ONLINE" : "COD",
+        paymentMode: "COD",
         paymentStatus: shopOrder.order?.paymentStatus,
 
         status: shopOrder.status || "Pending",
@@ -235,7 +234,7 @@ const MyOrders = () => {
         deliveryFee: Number(order.deliveryFee || 0),
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
-        paymentMode: order.paymentMethod === "online" ? "ONLINE" : "COD",
+        paymentMode: "COD",
         orderType: "DELIVERY",
         deliveryAddress: order.deliveryAddress,
         shops,
@@ -252,7 +251,7 @@ const MyOrders = () => {
       itemsTotal: Number(order.itemTotal || order.itemsTotal || 0),
       deliveryFee: Number(order.deliveryFee || 0),
       status: "Pending",
-      paymentMode: order.paymentMethod === "online" ? "ONLINE" : "COD",
+      paymentMode: "COD",
       items: (order.shops || []).flatMap((shop) => shop.items || []),
     }));
 
@@ -384,22 +383,6 @@ const MyOrders = () => {
       console.error("❌ Rebroadcast failed:", err);
     }
   };
-
-  const handleRetryPayment = (order) => {
-    navigate("/payment", {
-      state: {
-        retryOrderId: order.originalOrderId || order.id,
-        orderDetails: {
-          total: Number(order.totalAmount || 0),
-          itemTotal: Number(order.itemsTotal || 0),
-          deliveryFee: Number(order.deliveryFee || 0),
-          paymentMethod: "online",
-          address: order.deliveryAddress || null,
-        },
-      },
-    });
-  };
-
 
   /* ================= FILTER & SORT ================= */
 
@@ -556,7 +539,7 @@ const MyOrders = () => {
                     onRebroadcast={handleRebroadcast}
                   />
                 )
-                : <OrderCard key={order.id} order={order} onRetryPayment={handleRetryPayment} />
+                : <OrderCard key={order.id} order={order} />
             ))}
           </div>
         ) : (

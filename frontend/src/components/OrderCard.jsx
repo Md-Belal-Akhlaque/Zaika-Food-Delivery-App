@@ -41,7 +41,7 @@ const toShopStructure = (order) => {
   ];
 };
 
-const OrderCard = ({ order, onRetryPayment = null }) => {
+const OrderCard = ({ order }) => {
   const navigate = useNavigate();
 
   const shops = toShopStructure(order);
@@ -52,10 +52,6 @@ const OrderCard = ({ order, onRetryPayment = null }) => {
 
   const normalizedOrderStatus = normalizeStatus(order?.status || shops[0]?.status || "pending");
   const isDelivered = normalizedOrderStatus === "delivered";
-  const normalizedPaymentStatus = normalizeStatus(order?.paymentStatus || "");
-  const canRetryPayment =
-    String(order?.paymentMethod || "").toLowerCase() === "online" &&
-    (normalizedPaymentStatus === "failed" || normalizedPaymentStatus === "pending");
 
   const reorderItems = shops.flatMap((shop) =>
     (shop.items || []).map((item) => ({
@@ -90,7 +86,7 @@ const OrderCard = ({ order, onRetryPayment = null }) => {
           </span>
           <p className="text-xs text-gray-500 mt-2 flex items-center justify-end gap-1">
             <CreditCard className="w-4 h-4" />
-            {order.paymentMode === "COD" ? "Cash on Delivery" : "Online Paid"}
+            Cash on Delivery
           </p>
         </div>
       </div>
@@ -183,14 +179,6 @@ const OrderCard = ({ order, onRetryPayment = null }) => {
           </button>
         )}
 
-        {canRetryPayment && typeof onRetryPayment === "function" && (
-          <button
-            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 bg-amber-500 text-white hover:bg-amber-600 font-semibold"
-            onClick={() => onRetryPayment(order)}
-          >
-            Retry Payment
-          </button>
-        )}
       </div>
 
       {isDelivered && (

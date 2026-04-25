@@ -16,7 +16,7 @@ export const createOrderSchema = z.object({
     longitude: z.number(),
     landmark: z.string().optional(),
   }),
-  paymentMethod: z.enum(["cod", "online"]),
+  paymentMethod: z.enum(["cod","online"]).optional(),
   idempotencyKey: z.string().min(1, "Idempotency key is required"),
 });
 
@@ -28,17 +28,4 @@ export const orderQuoteSchema = z.object({
     longitude: z.number(),
     landmark: z.string().optional(),
   }),
-});
-
-export const verifyPaymentSchema = z.object({
-  appOrderId: z.string().min(1, "App order ID is required"),
-  razorpayOrderId: z.string().min(1, "Razorpay order ID is required"),
-  razorpayPaymentId: z.string().min(1, "Razorpay payment ID is required"),
-  razorpaySignature: z.string().min(1, "Razorpay signature is required"),
-});
-
-export const markPaymentFailedSchema = z.object({
-  appOrderId: z.string().min(1, "App order ID is required"),
-  razorpayOrderId: z.string().min(1, "Razorpay order ID is required").optional(),
-  reason: z.string().max(500, "Reason is too long").optional(),
 });

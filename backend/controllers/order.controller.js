@@ -1,6 +1,4 @@
-import crypto from "crypto";
 import mongoose from "mongoose";
-import Razorpay from "razorpay";
 import Order from "../models/orderModel.js";
 import ShopOrder from "../models/shopOrderModel.js";
 import Shop from "../models/shopModel.js";
@@ -15,7 +13,9 @@ import {
 } from "../services/order.service.js";
 import { enqueueBroadcast } from "../queue.js";
 import { emitToUser, emitToShop } from "../socket.js";
-import logger from "../utility/logger.js";
+
+import crypto from "crypto";
+import { razorpay } from "../utility/razorpay.js";
 
 const SHOP_ORDER_ALLOWED_STATUSES = [
   "Pending",
@@ -42,7 +42,7 @@ const buildRefundId = (orderId, shopOrderId) =>
 
 const applyShopOrderRefund = async ({ parentOrder, shopOrder, session = null }) => {
   if (!parentOrder || !shopOrder) return false;
-  if (parentOrder.paymentMethod !== "online" || parentOrder.paymentStatus !== "Paid") return false;
+  if (parentOrder.paymentMethod === "cod" || parentOrder.paymentStatus !== "Paid") return false;
   if (shopOrder.refundStatus === "Success") return false;
 
   const refundAmount = Number(shopOrder.totalAmount || 0);
@@ -126,45 +126,6 @@ const countNearbyDeliveryPartners = async (coordinates, radius = 5000) => {
     { $count: "count" }
   ]);
   return Number(result?.[0]?.count || 0);
-};
-
-const getRazorpayClient = () => {
-  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-    return null;
-  }
-
-  return new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
-  });
-};
-
-const markOrderAsPaid = async (order, { razorpayOrderId, razorpayPaymentId, razorpaySignature = null }) => {
-  order.paymentStatus = "Paid";
-  order.paymentCapturedAt = new Date();
-  order.paymentFailedAt = null;
-  order.paymentFailureReason = null;
-  order.razorpayOrderId = razorpayOrderId || order.razorpayOrderId;
-  order.razorpayPaymentId = razorpayPaymentId || order.razorpayPaymentId;
-  order.razorpaySignature = razorpaySignature || order.razorpaySignature;
-  await order.save();
-  return order;
-};
-
-const markOrderAsFailed = async (order, reason = "Payment failed") => {
-  if (order.paymentStatus === "Paid") {
-    return order;
-  }
-  order.paymentStatus = "Failed";
-  order.paymentFailedAt = new Date();
-  order.paymentFailureReason = reason;
-  await order.save();
-  return order;
-};
-
-const isValidWebhookSignature = ({ payload, signature, secret }) => {
-  const expectedSignature = crypto.createHmac("sha256", secret).update(payload).digest("hex");
-  return expectedSignature === signature;
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -277,254 +238,6 @@ export const getOrderQuote = async (req, res) => {
   }
 };
 
-export const createRazorpayOrder = async (req, res) => {
-  try {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return res.status(500).json({ success: false, message: "Razorpay keys are not configured" });
-    }
-
-    const razorpay = getRazorpayClient();
-    if (!razorpay) {
-      return res.status(500).json({ success: false, message: "Razorpay keys are not configured" });
-    }
-
-    const { cartItems, deliveryAddress, idempotencyKey } = req.body;
-    const userId = req.userId;
-
-    const order = await createOrderService({
-      userId,
-      cartItems,
-      deliveryAddress,
-      paymentMethod: "online",
-      idempotencyKey,
-    });
-
-    if (!order.razorpayOrderId) {
-      const razorpayOrder = await razorpay.orders.create({
-        amount: Math.round(Number(order.totalAmount) * 100),
-        currency: "INR",
-        receipt: `zaika_${order._id.toString().slice(-24)}`,
-        notes: { appOrderId: order._id.toString(), userId: userId.toString() },
-      });
-
-      order.razorpayOrderId = razorpayOrder.id;
-      await order.save();
-    }
-
-    return res.status(201).json({
-      success: true,
-      appOrderId: order._id,
-      razorpayOrderId: order.razorpayOrderId,
-      amount: Math.round(Number(order.totalAmount) * 100),
-      currency: "INR",
-      key: process.env.RAZORPAY_KEY_ID,
-    });
-  } catch (error) {
-    console.error("CREATE_RAZORPAY_ORDER_ERR:", error);
-    return res.status(error.statusCode || 500).json({
-      success: false,
-      message: error.message || "Failed to create Razorpay order",
-    });
-  }
-};
-
-export const retryRazorpayPayment = async (req, res) => {
-  try {
-    if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
-      return res.status(500).json({ success: false, message: "Razorpay keys are not configured" });
-    }
-
-    const { orderId } = req.params;
-    const userId = req.userId;
-
-    const order = await Order.findById(orderId);
-    if (!order) {
-      return res.status(404).json({ success: false, message: "Order not found" });
-    }
-
-    if (order.user.toString() !== userId.toString()) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
-
-    if (order.paymentMethod !== "online") {
-      return res.status(400).json({ success: false, message: "Retry is only available for online payments" });
-    }
-
-    if (order.paymentStatus === "Paid") {
-      return res.status(400).json({ success: false, message: "Order is already paid" });
-    }
-
-    const razorpay = getRazorpayClient();
-    if (!razorpay) {
-      return res.status(500).json({ success: false, message: "Razorpay keys are not configured" });
-    }
-
-    const razorpayOrder = await razorpay.orders.create({
-      amount: Math.round(Number(order.totalAmount) * 100),
-      currency: "INR",
-      receipt: `zaika_retry_${order._id.toString().slice(-20)}`,
-      notes: { appOrderId: order._id.toString(), userId: userId.toString(), retry: "true" },
-    });
-
-    order.razorpayOrderId = razorpayOrder.id;
-    order.paymentStatus = "Pending";
-    order.paymentFailedAt = null;
-    order.paymentFailureReason = null;
-    await order.save();
-
-    return res.status(200).json({
-      success: true,
-      appOrderId: order._id,
-      razorpayOrderId: order.razorpayOrderId,
-      amount: Math.round(Number(order.totalAmount) * 100),
-      currency: "INR",
-      key: process.env.RAZORPAY_KEY_ID,
-    });
-  } catch (error) {
-    logger.error("retry_razorpay_payment_error", {
-      orderId: req.params?.orderId,
-      userId: req.userId,
-      error: error?.message || String(error),
-    });
-    return res.status(500).json({
-      success: false,
-      message: error.message || "Failed to retry payment",
-    });
-  }
-};
-
-export const verifyRazorpayPayment = async (req, res) => {
-  try {
-    const { appOrderId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = req.body;
-
-    const order = await Order.findById(appOrderId);
-    if (!order) {
-      return res.status(404).json({ success: false, message: "Order not found" });
-    }
-
-    if (order.user.toString() !== req.userId.toString()) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
-
-    if (order.paymentStatus === "Paid") {
-      return res.status(200).json({ success: true, message: "Payment already verified", order });
-    }
-
-    if (order.razorpayOrderId !== razorpayOrderId) {
-      await markOrderAsFailed(order, "Invalid Razorpay order reference");
-      return res.status(400).json({ success: false, message: "Invalid Razorpay order reference" });
-    }
-
-    const generatedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpayOrderId}|${razorpayPaymentId}`)
-      .digest("hex");
-
-    if (generatedSignature !== razorpaySignature) {
-      await markOrderAsFailed(order, "Payment signature verification failed");
-      return res.status(400).json({ success: false, message: "Payment signature verification failed" });
-    }
-
-    await markOrderAsPaid(order, {
-      razorpayOrderId,
-      razorpayPaymentId,
-      razorpaySignature,
-    });
-
-    return res.status(200).json({ success: true, message: "Payment verified successfully", order });
-  } catch (error) {
-    console.error("VERIFY_RAZORPAY_PAYMENT_ERR:", error);
-    return res.status(500).json({ success: false, message: error.message || "Payment verification failed" });
-  }
-};
-
-export const markRazorpayPaymentFailed = async (req, res) => {
-  try {
-    const { appOrderId, razorpayOrderId, reason } = req.body;
-
-    const order = await Order.findById(appOrderId);
-    if (!order) {
-      return res.status(404).json({ success: false, message: "Order not found" });
-    }
-
-    if (order.user.toString() !== req.userId.toString()) {
-      return res.status(403).json({ success: false, message: "Not authorized" });
-    }
-
-    if (order.paymentStatus === "Paid") {
-      return res.status(200).json({ success: true, message: "Order is already paid", order });
-    }
-
-    if (razorpayOrderId && order.razorpayOrderId && razorpayOrderId !== order.razorpayOrderId) {
-      return res.status(400).json({ success: false, message: "Invalid Razorpay order reference" });
-    }
-
-    await markOrderAsFailed(order, reason || "Payment cancelled by user");
-
-    return res.status(200).json({
-      success: true,
-      message: "Payment marked as failed",
-      order,
-    });
-  } catch (error) {
-    console.error("MARK_RAZORPAY_PAYMENT_FAILED_ERR:", error);
-    return res.status(500).json({ success: false, message: error.message || "Failed to update payment state" });
-  }
-};
-
-export const handleRazorpayWebhook = async (req, res) => {
-  try {
-    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-    if (!webhookSecret) {
-      return res.status(500).json({ success: false, message: "Razorpay webhook secret is not configured" });
-    }
-
-    const signature = req.headers["x-razorpay-signature"];
-    if (!signature) {
-      return res.status(400).json({ success: false, message: "Missing webhook signature" });
-    }
-
-    const payload = req.rawBody || JSON.stringify(req.body || {});
-    const signatureValid = isValidWebhookSignature({
-      payload,
-      signature,
-      secret: webhookSecret,
-    });
-
-    if (!signatureValid) {
-      return res.status(400).json({ success: false, message: "Invalid webhook signature" });
-    }
-
-    const event = req.body?.event;
-    const paymentEntity = req.body?.payload?.payment?.entity;
-
-    if (!paymentEntity?.order_id) {
-      return res.status(200).json({ success: true, message: "Webhook received (no order mapping)" });
-    }
-
-    const order = await Order.findOne({ razorpayOrderId: paymentEntity.order_id });
-    if (!order) {
-      return res.status(200).json({ success: true, message: "Webhook received (order not found)" });
-    }
-
-    if (event === "payment.captured") {
-      if (order.paymentStatus !== "Paid") {
-        await markOrderAsPaid(order, {
-          razorpayOrderId: paymentEntity.order_id,
-          razorpayPaymentId: paymentEntity.id,
-          razorpaySignature: order.razorpaySignature,
-        });
-      }
-    } else if (event === "payment.failed") {
-      await markOrderAsFailed(order, paymentEntity.error_description || "Payment failed");
-    }
-
-    return res.status(200).json({ success: true, message: "Webhook processed" });
-  } catch (error) {
-    console.error("RAZORPAY_WEBHOOK_ERR:", error);
-    return res.status(500).json({ success: false, message: "Failed to process webhook" });
-  }
-};
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GET MY ORDERS (User)
@@ -886,4 +599,101 @@ export const cancelOrder = async (req, res) => {
   }
 };
 
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// INITIATE RAZORPAY PAYMENT
+// Called BEFORE placing the order — creates a Razorpay order
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export const initiatePayment = async (req, res) => {
+  try {
+    const { cartItems, deliveryAddress, idempotencyKey } = req.body;
 
+    // Get the authoritative total from your existing service
+    const { shopGroups, itemsTotal } = await groupItemsByShop(cartItems);
+    const { fee: deliveryFee } = calculateDeliveryFee(itemsTotal);
+    const totalAmount = Number((itemsTotal + deliveryFee).toFixed(2));
+
+    // Razorpay requires amount in paise (1 INR = 100 paise)
+    const amountInPaise = Math.round(totalAmount * 100);
+
+    const razorpayOrder = await razorpay.orders.create({
+      amount: amountInPaise,
+      currency: "INR",
+      receipt: `rcpt_${Date.now()}`,
+      notes: {
+        idempotencyKey: idempotencyKey || "",
+        userId: req.userId,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      razorpayOrderId: razorpayOrder.id,
+      amount: amountInPaise,
+      currency: "INR",
+      keyId: process.env.RAZORPAY_KEY_ID,
+    });
+  } catch (error) {
+    console.error("INITIATE_PAYMENT_ERR:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// VERIFY PAYMENT & CREATE ORDER
+// Called after Razorpay modal success on frontend
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export const verifyPaymentAndCreateOrder = async (req, res) => {
+  try {
+    const {
+      razorpayOrderId,
+      razorpayPaymentId,
+      razorpaySignature,
+      cartItems,
+      deliveryAddress,
+      idempotencyKey,
+    } = req.body;
+
+    // ── Signature Verification ──────────────────────────────
+    // Skip in test bypass mode (useful for automated tests)
+    if (process.env.RAZORPAY_VERIFY_BYPASS !== "true") {
+      const expectedSignature = crypto
+        .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+        .update(`${razorpayOrderId}|${razorpayPaymentId}`)
+        .digest("hex");
+
+      if (expectedSignature !== razorpaySignature) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment verification failed. Invalid signature.",
+        });
+      }
+    }
+
+    // ── Create the actual order (reuse your existing service) ──
+    const order = await createOrderService({
+      userId: req.userId,
+      cartItems,
+      deliveryAddress,
+      paymentMethod: "online",
+      idempotencyKey,
+      // Pass payment metadata so the service can mark it Paid
+      paymentMeta: {
+        razorpayOrderId,
+        razorpayPaymentId,
+        razorpaySignature,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Payment verified and order placed successfully",
+      order,
+    });
+  } catch (error) {
+    console.error("VERIFY_PAYMENT_ERR:", error);
+    return res.status(error.statusCode || 500).json({
+      success: false,
+      message: error.message || "Failed to verify payment",
+    });
+  }
+};

@@ -14,16 +14,12 @@ import orderRouter from './routes/order.routes.js';
 import ratingRouter from './routes/rating.routes.js';
 import deliveryRouter from './routes/delivery.routes.js';
 import { authLimiter } from './middleware/rateLimiter.js';
+import webhookRouter from "./routes/webhook.routes.js";
 
 const app = express();
 
-app.use(express.json({
-    verify: (req, res, buf) => {
-        if (req.originalUrl?.includes("/api/order/razorpay-webhook")) {
-            req.rawBody = buf.toString();
-        }
-    }
-}));
+app.use("/webhooks", webhookRouter); // Must be BEFORE express.json()
+app.use(express.json());
 
 app.use(cors({
     origin: process.env.CLIENT_URL || process.env.FRONTEND_URL || 'http://localhost:5173',

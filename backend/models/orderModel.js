@@ -67,13 +67,13 @@ const orderSchema = new mongoose.Schema(
     // Payment
     paymentMethod: {
       type: String,
-      enum: ["cod", "online"],
+      enum: ["cod","online"],
       required: true
     },
     // Order model mein add karo
     deliveryFeeBreakdown: {
     type: String,
-    enum: ["free", "5_percent", "10_percent"],
+    enum: ["free", "10_percent"],
     default: null
     },
     paymentStatus: {
@@ -87,19 +87,12 @@ const orderSchema = new mongoose.Schema(
     paymentFailedAt: { type: Date, default: null },
     paymentFailureReason: { type: String, default: null },
 
-    // Stock reservation safety for online orders (TTL release)
+    // Stock reservation metadata (currently unused with COD-only flow)
     stockReservedAt: { type: Date, default: null },
     stockReleaseAt: { type: Date, default: null },
     isStockReleased: { type: Boolean, default: false },
     stockReleasedAt: { type: Date, default: null },
     stockReleaseReason: { type: String, default: null },
-
-    // Razorpay Fields (only populated for online payments)
-    razorpayOrderId:   { type: String, default: null },
-    // Keep old Razorpay order references so webhook mapping remains safe after retries
-    razorpayOrderIdHistory: { type: [String], default: [] },
-    razorpayPaymentId: { type: String, default: null },
-    razorpaySignature: { type: String, default: null },
 
     // Overall order status â€” derived from all ShopOrder statuses
     // Updated enum to reflect multi-shop reality:
@@ -134,11 +127,7 @@ const orderSchema = new mongoose.Schema(
 // "Order history for this user, newest first" â€” most common query
 orderSchema.index({ user: 1, createdAt: -1 });
 
-// "Find order by razorpay id" â€” used in payment webhook
-orderSchema.index({ razorpayOrderId: 1 }, { sparse: true });
-orderSchema.index({ razorpayOrderIdHistory: 1 }, { sparse: true });
-
-// "Find pending online orders whose stock reservation has expired"
+// "Find pending orders whose stock reservation has expired"
 orderSchema.index({
   paymentMethod: 1,
   paymentStatus: 1,
@@ -338,7 +327,7 @@ export default mongoose.model("ShopOrder", shopOrderSchema);
 //     // Payment
 //     paymentMethod: {
 //       type: String,
-//       enum: ["cod", "online"],
+//       enum: ["cod"],
 //       required: true
 //     },
 //     paymentStatus: {
@@ -346,11 +335,6 @@ export default mongoose.model("ShopOrder", shopOrderSchema);
 //       enum: ["Pending", "Paid", "Failed"],
 //       default: "Pending"
 //     },
-
-//     // Razorpay Fields
-//     razorpayOrderId: String,
-//     razorpayPaymentId: String,
-//     razorpaySignature: String,
 
 //     orderStatus: {
 //       type: String,
