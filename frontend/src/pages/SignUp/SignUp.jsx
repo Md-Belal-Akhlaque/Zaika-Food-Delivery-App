@@ -12,7 +12,7 @@ const roleOptions = [
 ];
 
 const SignUp = () => {
-  
+
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { request, loading } = useApi();
@@ -81,6 +81,8 @@ const SignUp = () => {
         loadingMessage: "Creating your account...",
         successMessage: "Account created successfully! Please sign in.",
         onSuccess: (data) => {
+          // Add this line
+          if (data.token) localStorage.setItem("token", data.token);
           dispatch(setUserData(data.user));
           setErrors({});
           navigate("/signin");
@@ -133,11 +135,11 @@ const SignUp = () => {
         <form className="space-y-6" onSubmit={handleSubmit}>
           {/* Full Name */}
           <div>
-            <label className="block text-gray-700 font-medium mb-1" htmlFor = "fullName">
+            <label className="block text-gray-700 font-medium mb-1" htmlFor="fullName">
               Full Name
             </label>
             <input
-              id = "fullName"
+              id="fullName"
               name="fullName"
               type="text"
               placeholder="Enter your full name"
@@ -163,11 +165,11 @@ const SignUp = () => {
           {/* Email */}
           <div>
             <label className="block text-gray-700 font-medium mb-1"
-              htmlFor = "email">
+              htmlFor="email">
               Email
             </label>
             <input
-              id = "email"
+              id="email"
               name="email"
               type="email"
               placeholder="Enter your email address"
@@ -192,11 +194,11 @@ const SignUp = () => {
 
           {/* Password */}
           <div className="relative">
-            <label className="block text-gray-700 font-medium mb-1" htmlFor = "password">
+            <label className="block text-gray-700 font-medium mb-1" htmlFor="password">
               Password
             </label>
             <input
-              id = "password"
+              id="password"
               name="password"
               type={showPassword ? "text" : "password"}
               placeholder="Enter your password"
@@ -228,11 +230,11 @@ const SignUp = () => {
 
           {/* Phone */}
           <div>
-            <label className="block text-gray-700 font-medium mb-1"htmlFor = "mobile">
+            <label className="block text-gray-700 font-medium mb-1" htmlFor="mobile">
               Phone
             </label>
             <input
-              id = "mobile"
+              id="mobile"
               name="mobile"
               type="tel"
               maxLength={10}
@@ -267,9 +269,8 @@ const SignUp = () => {
                   key={key}
                   type="button"
                   onClick={() => handleRoleSelect(key)}
-                  className={`cursor-pointer flex flex-col items-center justify-center rounded-xl border px-4 py-3 w-24 shadow-sm transition-all duration-200 hover:scale-105 ${
-                    formData.role === key ? "ring-2 ring-offset-2" : "opacity-85 hover:opacity-100"
-                  }`}
+                  className={`cursor-pointer flex flex-col items-center justify-center rounded-xl border px-4 py-3 w-24 shadow-sm transition-all duration-200 hover:scale-105 ${formData.role === key ? "ring-2 ring-offset-2" : "opacity-85 hover:opacity-100"
+                    }`}
                   style={{
                     borderColor: formData.role === key ? colors.primary : colors.border,
                     color: formData.role === key ? colors.primary : "inherit",

@@ -72,17 +72,17 @@ const userSlice = createSlice({
       state.itemsInMyCity = action.payload;
     },
 
-    //  CHATGPT CHANGE: Separate setter for USER
+    //  : Separate setter for USER
     setUserOrders: (state, action) => {
       state.userOrders = Array.isArray(action.payload) ? action.payload : [];
     },
 
-    //  CHATGPT CHANGE: Separate setter for OWNER
+    //  : Separate setter for OWNER
     setOwnerOrders: (state, action) => {
       state.ownerOrders = Array.isArray(action.payload) ? action.payload : [];
     },
 
-    //  CHATGPT CHANGE: Safe update for BOTH structures
+    //  : Safe update for BOTH structures
     updateOrderStatus: (state, action) => {
       const { orderId, shopOrderId, status } = action.payload;
 

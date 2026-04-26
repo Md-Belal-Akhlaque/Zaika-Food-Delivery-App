@@ -8,6 +8,15 @@ const api = axios.create({
   withCredentials: true,
 });
 
+// ✅ Automatically attach token to every request
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 export const useApi = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -33,15 +42,13 @@ export const useApi = () => {
       const response = await api(config);
       const data = response.data;
 
-      // Robust check: if backend didn't send success: true, 
-      // we still treat 2xx status as success unless success is explicitly false.
       if (data.success !== false) {
         if (showToast && toastId) {
           toast.success(successMessage || data.message || "Action successful", { id: toastId });
         } else if (showToast && config.method !== "get") {
           toast.success(successMessage || data.message || "Action successful");
         }
-        
+
         if (onSuccess) onSuccess(data);
         return { data, error: null };
       } else {
@@ -60,8 +67,9 @@ export const useApi = () => {
         err.response?.data?.message ||
         (isNetworkError ? networkErrorMessage : err.message) ||
         "Something went wrong. Please try again.";
+
       setError(msg);
-      
+
       if (showToast) {
         if (toastId) {
           toast.error(msg, { id: toastId });
@@ -69,7 +77,7 @@ export const useApi = () => {
           toast.error(msg);
         }
       }
-      
+
       if (onError) onError(err);
       return { data: null, error: err };
     } finally {

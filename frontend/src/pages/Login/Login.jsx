@@ -57,14 +57,14 @@ const Login = () => {
         loadingMessage: "Logging you in...",
         successMessage: "Welcome back! Login successful.",
         onSuccess: (data) => {
+          // ✅ Store token in localStorage for cross-domain auth
+          if (data.token) localStorage.setItem("token", data.token);
           dispatch(setUserData(data.user));
           navigate("/");
         },
       }
     );
   };
-
-
 
   return (
     <div
@@ -73,7 +73,6 @@ const Login = () => {
         background: `linear-gradient(135deg, ${colors.bg}, #ffe0c7)`,
       }}
     >
-      {/* Loading Transition Overlay */}
       <div
         className="loading-screen absolute top-0 left-0 w-full h-full bg-[#ff6b35] flex items-center justify-center text-white text-2xl font-bold z-50"
         style={{ transform: "translateY(100%)" }}
@@ -99,14 +98,9 @@ const Login = () => {
           Welcome back foodie! <br /> Log in to continue your cravings 🍟
         </p>
 
-        {/* FORM */}
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Email */}
           <div>
-            <label
-              htmlFor="email"
-              className="block text-gray-700 font-medium mb-1"
-            >
+            <label htmlFor="email" className="block text-gray-700 font-medium mb-1">
               Email
             </label>
             <input
@@ -117,27 +111,17 @@ const Login = () => {
               value={formData.email}
               onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 focus:outline-none transition-all duration-200"
-              style={{
-                borderColor: errors.email ? "red" : colors.border,
-              }}
-              onFocus={(e) =>
-                (e.target.style.boxShadow = `0 0 0 3px ${colors.focusGlow}`)
-              }
+              style={{ borderColor: errors.email ? "red" : colors.border }}
+              onFocus={(e) => (e.target.style.boxShadow = `0 0 0 3px ${colors.focusGlow}`)}
               onBlur={(e) => (e.target.style.boxShadow = "none")}
             />
             {errors.email && (
-              <p className="text-red-600 text-sm mt-1 font-medium">
-                {errors.email}
-              </p>
+              <p className="text-red-600 text-sm mt-1 font-medium">{errors.email}</p>
             )}
           </div>
 
-          {/* Password */}
           <div className="relative">
-            <label
-              htmlFor="password"
-              className="block text-gray-700 font-medium mb-1"
-            >
+            <label htmlFor="password" className="block text-gray-700 font-medium mb-1">
               Password
             </label>
             <input
@@ -148,12 +132,8 @@ const Login = () => {
               value={formData.password}
               onChange={handleChange}
               className="w-full border rounded-lg px-3 py-2 pr-10 focus:outline-none transition-all duration-200"
-              style={{
-                borderColor: errors.password ? "red" : colors.border,
-              }}
-              onFocus={(e) =>
-                (e.target.style.boxShadow = `0 0 0 3px ${colors.focusGlow}`)
-              }
+              style={{ borderColor: errors.password ? "red" : colors.border }}
+              onFocus={(e) => (e.target.style.boxShadow = `0 0 0 3px ${colors.focusGlow}`)}
               onBlur={(e) => (e.target.style.boxShadow = "none")}
             />
             <button
@@ -165,13 +145,10 @@ const Login = () => {
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
             {errors.password && (
-              <p className="text-red-600 text-sm mt-1 font-medium">
-                {errors.password}
-              </p>
+              <p className="text-red-600 text-sm mt-1 font-medium">{errors.password}</p>
             )}
           </div>
 
-          {/* Forgot password */}
           <div className="text-right">
             <button
               type="button"
@@ -183,15 +160,13 @@ const Login = () => {
             </button>
           </div>
 
-          {/* Submit */}
           <button
             type="submit"
             disabled={loading}
-            className={`flex items-center justify-center gap-2 cursor-pointer w-full py-3 rounded-lg font-bold text-white shadow-lg transition-all duration-200 hover:scale-[1.03] ${loading ? "opacity-70 cursor-not-allowed" : ""
-              }`}
-            style={{
-              backgroundColor: colors.primary,
-            }}
+            className={`flex items-center justify-center gap-2 cursor-pointer w-full py-3 rounded-lg font-bold text-white shadow-lg transition-all duration-200 hover:scale-[1.03] ${
+              loading ? "opacity-70 cursor-not-allowed" : ""
+            }`}
+            style={{ backgroundColor: colors.primary }}
           >
             {loading ? (
               <>
@@ -204,18 +179,14 @@ const Login = () => {
           </button>
         </form>
 
-        {/* Divider */}
         <div className="flex items-center my-6">
           <hr className="grow border-t border-gray-300" />
           <span className="px-2 text-gray-500 text-sm">or</span>
           <hr className="grow border-t border-gray-300" />
         </div>
 
-        {/* Social login */}
         <div className="flex justify-center gap-4">
-          <button className=" cursor-pointer flex items-center gap-2 border rounded-lg px-4 py-2 hover:scale-105 transition-all duration-200 shadow-sm bg-white active:bg-gray-300"
-          // onClick={handleGoogleAuth}
-          >
+          <button className="cursor-pointer flex items-center gap-2 border rounded-lg px-4 py-2 hover:scale-105 transition-all duration-200 shadow-sm bg-white active:bg-gray-300">
             <img
               src="https://www.svgrepo.com/show/475656/google-color.svg"
               alt="Google"
@@ -223,21 +194,10 @@ const Login = () => {
             />
             <span className="text-gray-700 text-sm font-semibold">Google</span>
           </button>
-          {/* <button className="flex items-center gap-2 border rounded-lg px-4 py-2 hover:scale-105 transition-all duration-200 shadow-sm bg-white active:bg-gray-300">
-            <img
-              src="https://www.svgrepo.com/show/475647/facebook-color.svg"
-              alt="Facebook"
-              className="w-5 h-5"
-            />
-            <span className="text-gray-700 text-sm font-semibold">
-              Facebook
-            </span>
-          </button> */}
         </div>
 
-        {/* Register link */}
         <p className="mt-6 text-center text-gray-700 text-sm">
-          Don’t have an account?{" "}
+          Don't have an account?{" "}
           <Link
             to="/signup"
             className="font-semibold hover:underline"
