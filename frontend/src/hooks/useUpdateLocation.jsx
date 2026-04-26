@@ -14,6 +14,9 @@ function useUpdateLocation() {
           { lat, lon },
           {
             withCredentials: true,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+            }
           }
         );
       } catch {

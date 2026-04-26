@@ -35,7 +35,12 @@ const Map = () => {
     const getAddressByLatLon = async (lat, lon) => {
         try {
             const { data } = await axios.get(
-                `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`
+                `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
+                }
             );
 
             const props = data?.features?.[0]?.properties;
@@ -127,7 +132,12 @@ const Map = () => {
 
         try {
             const { data } = await axios.get(
-                `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(addressInput)}&apiKey=${apiKey}`
+                `https://api.geoapify.com/v1/geocode/search?text=${encodeURIComponent(addressInput)}&apiKey=${apiKey}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
+                }
             );
 
             if (data.features.length > 0) {

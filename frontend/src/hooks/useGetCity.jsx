@@ -23,7 +23,12 @@ const useGetCity = () => {
         const lon = position.coords.longitude;
 
         const { data } = await axios.get(
-          `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`
+          `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`,
+          {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+            }
+          }
         );
 
         const props = data?.features?.[0]?.properties || {};
@@ -48,7 +53,11 @@ const useGetCity = () => {
 
     const fetchIPLocation = async () => {
       try {
-        const { data } = await axios.get("https://ipapi.co/json/");
+        const { data } = await axios.get("https://ipapi.co/json/", {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        });
 
         const city = data.city || "Unknown City";
         const state = data.region || "Unknown State";

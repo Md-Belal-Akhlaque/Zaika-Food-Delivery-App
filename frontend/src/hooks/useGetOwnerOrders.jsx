@@ -10,7 +10,10 @@ const useGetOwnerOrders = () => {
         const fetchOrders = async () => {
             try {
                 const result = await axios.get(`${serverURL}/api/order/owner-orders`, {
-                    withCredentials: true
+                    withCredentials: true,
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
                 });
                 
                 if (result.data.success) {

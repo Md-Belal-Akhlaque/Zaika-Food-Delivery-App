@@ -131,7 +131,12 @@ const RateOrder = () => {
             rating: itemRating.rating,
             review: itemRating.review,
           },
-          { withCredentials: true }
+          {
+            withCredentials: true,
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+            }
+          }
         );
       });
 

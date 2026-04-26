@@ -21,7 +21,11 @@ const useGetShopByCity = () => {
                 if (filters.openOnly) params.append("openOnly", "true");
 
                 const url = `${serverURL}/api/shop/city/${encodeURIComponent(currentCity)}?${params.toString()}`;
-                const result = await axios.get(url);
+                const result = await axios.get(url, {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
+                });
                 
                 dispatch(setShopsInMyCity(result.data.shops));
             } catch {

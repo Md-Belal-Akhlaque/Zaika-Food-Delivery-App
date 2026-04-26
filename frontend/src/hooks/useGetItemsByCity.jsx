@@ -12,7 +12,11 @@ const useGetItemsByCity = () => {
         if (!currentCity) return;
         const fetchCityItems = async () => {
             try {
-                const result = await axios.get(`${serverURL}/api/item/by-city/${encodeURIComponent(currentCity)}`)
+                const result = await axios.get(`${serverURL}/api/item/by-city/${encodeURIComponent(currentCity)}`, {
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
+                })
                 dispatch(setItemsInMyCity(result.data.items));
             } catch {
                 // Ignore background fetch errors.

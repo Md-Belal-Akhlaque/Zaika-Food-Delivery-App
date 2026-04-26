@@ -14,7 +14,10 @@ const useGetMyOrders = () => {
         const fetchOrder = async () => {
             try {
                 const result = await axios.get(`${serverURL}/api/order/my-orders`, { 
-                    withCredentials: true 
+                    withCredentials: true,
+                    headers: {
+                        Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+                    }
                 });
                 
                 dispatch(setUserOrders(result.data.orders));

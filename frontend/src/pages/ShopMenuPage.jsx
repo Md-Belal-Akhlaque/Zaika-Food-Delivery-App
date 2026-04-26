@@ -24,7 +24,11 @@ const ShopMenuPage = () => {
   const fetchShopAndItems = async () => {
     try {
       setLoading(true);
-      const itemsRes = await axios.get(`${serverURL}/api/item/menu/${shopId}`);
+      const itemsRes = await axios.get(`${serverURL}/api/item/menu/${shopId}`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+        }
+      });
       setItems(itemsRes.data.items || []);
       setShop(itemsRes.data.shop || null);
     } catch (error) {

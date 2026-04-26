@@ -35,7 +35,10 @@ const OwnerMenuList = () => {
 
       // Get owner's shop
       const shopRes = await axios.get(`${serverURL}/api/shop/me`, {
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+        }
       });
       
       if (!shopRes.data.shop) {
@@ -48,7 +51,10 @@ const OwnerMenuList = () => {
       
       // Owner-specific item list (includes unavailable, excludes soft-deleted)
       const itemsRes = await axios.get(`${serverURL}/api/item/my-items`, {
-        withCredentials: true
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+        }
       });
       
       setItems(itemsRes.data.items || []);
@@ -69,7 +75,12 @@ const OwnerMenuList = () => {
       await axios.patch(
         `${serverURL}/api/item/toggle-availability/${itemId}`,
         {},
-        { withCredentials: true }
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        }
       );
       
       setItems(items.map(item => 
@@ -90,7 +101,12 @@ const OwnerMenuList = () => {
     try {
       await axios.delete(
         `${serverURL}/api/item/delete/${itemId}`,
-        { withCredentials: true }
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        }
       );
       
       setItems(items.filter(item => item._id !== itemId));

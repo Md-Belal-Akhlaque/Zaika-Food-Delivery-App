@@ -38,7 +38,15 @@ const Forgot = () => {
 
 
     try {
-      const response = await axios.post(`${serverURL}/api/auth/forgotPassword/send-otp`, {email} );
+      const response = await axios.post(
+        `${serverURL}/api/auth/forgotPassword/send-otp`,
+        { email },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        }
+      );
 
       // Agar backend success bheje to next step
       if (response.data.success) {
@@ -62,7 +70,15 @@ const Forgot = () => {
     const newErrors = {};
 
     try {
-      const response = await axios.post(`${serverURL}/api/auth/forgotPassword/verify-otp`, { email, otp });
+      const response = await axios.post(
+        `${serverURL}/api/auth/forgotPassword/verify-otp`,
+        { email, otp },
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
+        }
+      );
 
       if (response.data.success) {
         alert("OTP verified successfully!");
@@ -97,6 +113,10 @@ const Forgot = () => {
         const response = await axios.post(`${serverURL}/api/auth/forgotPassword/reset-password`, {
           email,
           newPassword: confirmPassword,
+        }, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
+          }
         });
 
         if (response.data.success) {
