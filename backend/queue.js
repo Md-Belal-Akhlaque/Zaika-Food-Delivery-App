@@ -69,6 +69,7 @@ const buildRedisConnectionOptions = () => {
     enableReadyCheck: false,
     connectTimeout: 10000,
     keepAlive: 30000,
+    noDelay: true,
     retryStrategy,
   };
 };
