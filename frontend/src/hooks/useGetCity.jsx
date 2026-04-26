@@ -22,22 +22,16 @@ const useGetCity = () => {
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
 
+        //  No Authorization header — geoapify is a third party API
         const { data } = await axios.get(
-          `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`,
-          {
-            headers: {
-              Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-            }
-          }
+          `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&apiKey=${apiKey}`
         );
 
         const props = data?.features?.[0]?.properties || {};
 
         const city =
           props.city || props.town || props.village || props.county || "Unknown City";
-
         const state = props.state || "Unknown State";
-
         const address =
           props.formatted || props.address_line1 || props.street || "Unknown Address";
 
@@ -47,17 +41,14 @@ const useGetCity = () => {
         dispatch(setLocation({ lat, lon }));
         dispatch(setAddress(address));
       } catch {
-        // Silent fallback; user-facing errors are handled in toasts.
+        // Silent fallback
       }
     };
 
     const fetchIPLocation = async () => {
       try {
-        const { data } = await axios.get("https://ipapi.co/json/", {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token") || ""}`
-          }
-        });
+        //  No Authorization header — ipapi.co is a third party API
+        const { data } = await axios.get("https://ipapi.co/json/");
 
         const city = data.city || "Unknown City";
         const state = data.region || "Unknown State";
@@ -69,7 +60,7 @@ const useGetCity = () => {
         dispatch(setLocation({ lat: data.latitude, lon: data.longitude }));
         dispatch(setAddress(address));
       } catch {
-        // Silent fallback failure.
+        // Silent fallback
       }
     };
 
@@ -90,7 +81,6 @@ const useGetCity = () => {
         default:
           toast.error("Location access failed. Using approximate location.");
       }
-
       fetchIPLocation();
     };
 
