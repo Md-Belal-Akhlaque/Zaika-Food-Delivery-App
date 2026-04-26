@@ -1,11 +1,13 @@
 import { Server } from "socket.io";
-import { createAdapter } from "@socket.io/redis-adapter";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import DeliveryAssignment from "./models/deliveryAssignmentModel.js";
 import Order from "./models/orderModel.js";
 import Shop from "./models/shopModel.js";
-import { createRedisClient, redisConnectionOptions } from "./queue.js";
+
+// ✅ Redis adapter REMOVED — not needed on single Render instance
+// Redis adapter is only required when running multiple server instances (horizontal scaling)
+// Using Socket.io's built-in in-memory adapter instead — zero extra Redis connections
 
 let io;
 const DELIVERY_PARTNER_ROOM = "deliveryPartner";
@@ -43,7 +45,6 @@ const addSocketToMap = (map, id, socketId) => {
 const removeSocketFromMap = (map, id, socketId) => {
   const existing = map.get(id);
   if (!existing) return false;
-
   existing.delete(socketId);
   if (existing.size === 0) {
     map.delete(id);
@@ -137,16 +138,8 @@ export const initSocket = (server) => {
     transports: ["websocket", "polling"]
   });
 
-  const pubClient = createRedisClient();
-  const subClient = pubClient.duplicate();
-  const endpointLabel = `${redisConnectionOptions.host}:${redisConnectionOptions.port}`;
-  pubClient.on("error", (err) =>
-    console.error(`[SOCKET] Redis Pub error (${endpointLabel}):`, err.message)
-  );
-  subClient.on("error", (err) =>
-    console.error(`[SOCKET] Redis Sub error (${endpointLabel}):`, err.message)
-  );
-  io.adapter(createAdapter(pubClient, subClient));
+  // ✅ No Redis adapter — in-memory adapter is used automatically
+  // This removes 2 Redis connections (pubClient + subClient)
 
   io.use((socket, next) => {
     try {
