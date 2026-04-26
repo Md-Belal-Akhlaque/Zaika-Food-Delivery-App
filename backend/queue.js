@@ -39,8 +39,8 @@ const buildRedisConnectionOptions = () => {
   }
 
   return {
-    host: process.env.REDIS_HOST || "127.0.0.1",
-    port: Number(process.env.REDIS_PORT || 6380),
+    host: process.env.REDIS_HOST",
+    port: Number(process.env.REDIS_PORT),
     password: process.env.REDIS_PASSWORD || undefined,
     tls: parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
     maxRetriesPerRequest: null
@@ -88,8 +88,8 @@ const getAdminAlertQueue = () => {
 
 export const isRedisReachable = (timeoutMs = 1500) =>
   new Promise((resolve) => {
-    const healthHost = redisConnectionOptions.host || "127.0.0.1";
-    const healthPort = Number(redisConnectionOptions.port || 6379);
+    const healthHost = redisConnectionOptions.host;
+    const healthPort = Number(redisConnectionOptions.port);
 
     const socket = net.createConnection({
       host: healthHost,
