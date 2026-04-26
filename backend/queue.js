@@ -1,6 +1,5 @@
 import { Queue } from "bullmq";
 import Redis from "ioredis";
-import net from "net";
 
 const parseBoolean = (value) => String(value || "").trim().toLowerCase() === "true";
 
@@ -21,11 +20,17 @@ const parseRedisConnectionFromUrl = (redisUrl) => {
 
     return {
       host: parsedUrl.hostname,
-      port: Number(parsedUrl.port || (useTlsFromUrl ? 6380 : 6379)),
+      port: Number(parsedUrl.port || 6379),
       username: username || undefined,
       password: passwordFromUrl || process.env.REDIS_PASSWORD || undefined,
       tls: useTlsFromUrl || parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
-      maxRetriesPerRequest: null
+      maxRetriesPerRequest: null,
+      enableReadyCheck: false,
+      lazyConnect: false,
+      retryStrategy: (times) => {
+        if (times > 5) return null; // Stop retrying after 5 attempts
+        return Math.min(times * 500, 3000);
+      },
     };
   } catch (error) {
     throw new Error(`Invalid REDIS_URL: ${error.message}`);
@@ -38,36 +43,93 @@ const buildRedisConnectionOptions = () => {
     return parseRedisConnectionFromUrl(redisUrl);
   }
 
+  const useTls =
+    parseBoolean(process.env.REDIS_TLS) ||
+    String(process.env.REDIS_HOST || "").includes("upstash.io");
+
   return {
     host: process.env.REDIS_HOST,
-    port: Number(process.env.REDIS_PORT),
+    port: Number(process.env.REDIS_PORT || 6379),
     password: process.env.REDIS_PASSWORD || undefined,
-    tls: parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
-    maxRetriesPerRequest: null
+    tls: useTls ? {} : undefined,
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+    lazyConnect: false,
+    retryStrategy: (times) => {
+      if (times > 5) return null;
+      return Math.min(times * 500, 3000);
+    },
   };
 };
 
 export const redisConnectionOptions = buildRedisConnectionOptions();
 const redisEndpointLabel = `${redisConnectionOptions.host}:${redisConnectionOptions.port}`;
 
-export const createRedisClient = () => new Redis(redisConnectionOptions);
+export const createRedisClient = () => {
+  const client = new Redis(redisConnectionOptions);
+  client.on("error", (err) => {
+    console.error(`[REDIS] Client error (${redisEndpointLabel}): ${err.message}`);
+  });
+  client.on("connect", () => {
+    console.log(`[REDIS] Connected to ${redisEndpointLabel}`);
+  });
+  client.on("ready", () => {
+    console.log(`[REDIS] Ready at ${redisEndpointLabel}`);
+  });
+  return client;
+};
 
-// FIX: Shared Redis connection with error handler
-// This prevents "missing 'error' handler" warnings
+// Shared Redis connection for BullMQ
 export const redisConnection = createRedisClient();
 redisConnection.on("error", (err) => {
   console.error(`[REDIS] Global connection error (${redisEndpointLabel}): ${err.message}`);
 });
 
+// ✅ Fixed: Uses PING instead of raw TCP (works with TLS/Upstash)
+export const isRedisReachable = async (timeoutMs = 3000) => {
+  let testClient = null;
+  try {
+    testClient = new Redis({
+      ...redisConnectionOptions,
+      lazyConnect: true,
+      connectTimeout: timeoutMs,
+      maxRetriesPerRequest: 1,
+      retryStrategy: () => null, // No retries for health check
+    });
+
+    await Promise.race([
+      testClient.ping(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Redis health check timed out")), timeoutMs)
+      ),
+    ]);
+
+    return true;
+  } catch (err) {
+    console.warn(`[REDIS] Health check failed: ${err.message}`);
+    return false;
+  } finally {
+    if (testClient) {
+      testClient.disconnect();
+    }
+  }
+};
+
+// ─── Queue Instances ──────────────────────────────────────────────────────────
+
 let deliveryBroadcastQueue = null;
 let adminAlertQueue = null;
 
 const createQueueWithLogging = (name) => {
-  const queue = new Queue(name, { connection: redisConnection });
+  const queue = new Queue(name, {
+    connection: redisConnection,
+    defaultJobOptions: {
+      removeOnComplete: { age: 3600, count: 1000 },
+      removeOnFail: { age: 24 * 3600, count: 1000 },
+    },
+  });
   queue.on("error", (error) => {
-    console.error(
-      `[QUEUE] ${name} connection error: ${error.message}`
-    );
+    console.error(`[QUEUE] ${name} error: ${error.message}`);
   });
   return queue;
 };
@@ -86,38 +148,18 @@ const getAdminAlertQueue = () => {
   return adminAlertQueue;
 };
 
-export const isRedisReachable = (timeoutMs = 1500) =>
-  new Promise((resolve) => {
-    const healthHost = redisConnectionOptions.host;
-    const healthPort = Number(redisConnectionOptions.port);
-
-    const socket = net.createConnection({
-      host: healthHost,
-      port: healthPort
-    });
-
-    let settled = false;
-    const done = (result) => {
-      if (settled) return;
-      settled = true;
-      socket.destroy();
-      resolve(result);
-    };
-
-    socket.setTimeout(timeoutMs);
-    socket.on("connect", () => done(true));
-    socket.on("error", () => done(false));
-    socket.on("timeout", () => done(false));
-  });
+// ─── Enqueue Helpers ──────────────────────────────────────────────────────────
 
 export const enqueueBroadcast = async (assignmentId, attemptNumber = 1) => {
   try {
-    const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
-    const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
     if (!assignmentId) {
       throw new Error("assignmentId is required for enqueueBroadcast");
     }
+
+    const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
+    const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
     const queue = getDeliveryBroadcastQueue();
+
     const existingJob = await queue.getJob(deterministicJobId);
     if (existingJob) {
       const state = await existingJob.getState();
@@ -128,22 +170,15 @@ export const enqueueBroadcast = async (assignmentId, attemptNumber = 1) => {
 
     const job = await queue.add(
       "broadcast-assignment",
-      {
-        assignmentId,
-        attemptNumber: normalizedAttempt
-      },
+      { assignmentId, attemptNumber: normalizedAttempt },
       {
         jobId: deterministicJobId,
         attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 2000
-        },
-        removeOnComplete: { age: 3600, count: 1000 },
-        removeOnFail: { age: 24 * 3600, count: 1000 },
-        delay: 0
+        backoff: { type: "exponential", delay: 2000 },
+        delay: 0,
       }
     );
+
     return job;
   } catch (error) {
     console.error(
@@ -160,31 +195,25 @@ export const enqueueBroadcastWithDelay = async (
   delayMs = 15000
 ) => {
   try {
-    const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
-    const normalizedDelay = Math.max(0, Number(delayMs) || 0);
-    const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
     if (!assignmentId) {
       throw new Error("assignmentId is required for enqueueBroadcastWithDelay");
     }
 
+    const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
+    const normalizedDelay = Math.max(0, Number(delayMs) || 0);
+    const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
+
     const job = await getDeliveryBroadcastQueue().add(
       "broadcast-assignment",
-      {
-        assignmentId,
-        attemptNumber: normalizedAttempt
-      },
+      { assignmentId, attemptNumber: normalizedAttempt },
       {
         jobId: deterministicJobId,
         attempts: 3,
-        backoff: {
-          type: "exponential",
-          delay: 2000
-        },
-        removeOnComplete: { age: 3600, count: 1000 },
-        removeOnFail: { age: 24 * 3600, count: 1000 },
-        delay: normalizedDelay
+        backoff: { type: "exponential", delay: 2000 },
+        delay: normalizedDelay,
       }
     );
+
     return job;
   } catch (error) {
     console.error(
@@ -199,15 +228,7 @@ export const enqueueAdminAlert = async (type, data = {}) => {
   try {
     const job = await getAdminAlertQueue().add(
       "admin-alert",
-      {
-        type,
-        data,
-        timestamp: new Date().toISOString()
-      },
-      {
-        removeOnComplete: { age: 24 * 3600, count: 1000 },
-        removeOnFail: { age: 7 * 24 * 3600, count: 1000 }
-      }
+      { type, data, timestamp: new Date().toISOString() }
     );
     return job;
   } catch (error) {
@@ -215,3 +236,19 @@ export const enqueueAdminAlert = async (type, data = {}) => {
     throw error;
   }
 };
+
+// ─── Graceful Shutdown ────────────────────────────────────────────────────────
+
+const shutdown = async () => {
+  console.log("[REDIS] Shutting down Redis connections...");
+  try {
+    if (deliveryBroadcastQueue) await deliveryBroadcastQueue.close();
+    if (adminAlertQueue) await adminAlertQueue.close();
+    await redisConnection.quit();
+  } catch (err) {
+    console.error("[REDIS] Error during shutdown:", err.message);
+  }
+};
+
+process.on("SIGTERM", shutdown);
+process.on("SIGINT", shutdown);
