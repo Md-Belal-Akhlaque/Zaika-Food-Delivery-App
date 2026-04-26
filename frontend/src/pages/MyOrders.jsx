@@ -33,6 +33,34 @@ const MyOrders = () => {
     ? String(ownerSocketShopId || ownerOrders?.[0]?.shop?._id || ownerOrders?.[0]?.shop || "")
     : "";
 
+  const getOrderItemId = (lineItem) => {
+    const ref = lineItem?.item;
+    if (ref && typeof ref === "object") {
+      return String(ref._id || ref.id || "");
+    }
+    return String(ref || lineItem?.itemId || "");
+  };
+
+  const getOrderItemImage = (lineItem) => {
+    if (lineItem?.image) return lineItem.image;
+    const ref = lineItem?.item;
+    if (ref && typeof ref === "object" && ref.image) return ref.image;
+    return "";
+  };
+
+  const getOrderItemName = (lineItem) => {
+    const ref = lineItem?.item;
+    if (lineItem?.name) return lineItem.name;
+    if (ref && typeof ref === "object" && ref.name) return ref.name;
+    return "Item";
+  };
+
+  const getOrderItemVariants = (lineItem) =>
+    Array.isArray(lineItem?.variants) ? lineItem.variants : [];
+
+  const getOrderItemAddons = (lineItem) =>
+    Array.isArray(lineItem?.addons) ? lineItem.addons : [];
+
   useEffect(() => {
     let active = true;
     const fetchOwnerShopId = async () => {
@@ -129,7 +157,7 @@ const MyOrders = () => {
         id: shopOrder._id,
         originalOrderId: shopOrder.order?._id,
         shopOrderId: shopOrder._id,
-        shopId: shopOrder.shop?._id,
+        shopId: shopOrder.shop?._id || shopOrder.shop,
 
         createdAt: shopOrder.createdAt,
         orderTime: shopOrder.order?.createdAt || shopOrder.createdAt,
@@ -176,14 +204,14 @@ const MyOrders = () => {
 
         // FIXED: Use 'items' field (not 'shopOrderItems') as per backend schema
         items: (shopOrder.items || []).map(it => ({
-          id: it.item?._id || it._id,
-          name: it.name || it.item?.name || "Item",
+          id: getOrderItemId(it),
+          name: getOrderItemName(it),
           price: Number(it.price || 0),
           quantity: it.quantity || 1,
           totalPrice: Number(it.totalPrice || it.lineTotal || 0),
-          image: it.item?.image,
-          variants: it.variants || [],
-          addons: it.addons || [],
+          image: getOrderItemImage(it),
+          variants: getOrderItemVariants(it),
+          addons: getOrderItemAddons(it),
           specialInstructions: it.specialInstructions || ""
         }))
       }));
@@ -197,19 +225,21 @@ const MyOrders = () => {
     const formattedUserOrders = dataSource.map((order) => {
       const shops = (order.shopOrders || []).map((shopOrder) => ({
         shopOrderId: shopOrder._id,
-        shopId: shopOrder.shop?._id,
+        shopId: shopOrder.shop?._id || shopOrder.shop,
         shopName: shopOrder.shop?.name || "Restaurant",
         status: shopOrder.status || "Pending",
         shopSubtotal: Number(shopOrder.subtotal || 0),
         items: (shopOrder.items || []).map((it) => ({
-          id: it.item?._id || it._id,
-          name: it.name || it.item?.name || "Item",
+          id: getOrderItemId(it),
+          name: getOrderItemName(it),
           price: Number(it.price || 0),
           quantity: it.quantity || 1,
           totalPrice: Number(it.totalPrice || it.lineTotal || 0),
-          image: it.item?.image,
-          selectedVariant: Array.isArray(it.variants) && it.variants.length > 0 ? it.variants[0] : null,
-          selectedAddons: it.addons || [],
+          image: getOrderItemImage(it),
+          selectedVariant: getOrderItemVariants(it).length > 0 ? getOrderItemVariants(it)[0] : null,
+          selectedAddons: getOrderItemAddons(it),
+          variants: getOrderItemVariants(it),
+          addons: getOrderItemAddons(it),
         })),
       }));
 

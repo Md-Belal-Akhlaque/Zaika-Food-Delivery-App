@@ -248,7 +248,10 @@ export const getMyOrders = async (req, res) => {
     const orders = await Order.find({ user: userId })
       .populate({
         path: "shopOrders",
-        populate: { path: "shop", select: "name image city" }
+        populate: [
+          { path: "shop", select: "name image city rating ratingCount" },
+          { path: "items.item", select: "name image rating ratingCount shop" }
+        ]
       })
       .sort({ createdAt: -1 });
 
@@ -321,6 +324,7 @@ export const getOwnerOrders = async (req, res) => {
         }
       })
       .populate("shop", "name")
+      .populate("items.item", "name image rating ratingCount shop")
       .populate({
         path: "deliveryAssignment",
         select: "assignmentStatus broadcastStatus broadcastExpiresAt assignedDeliveryPartner pickupLocation",

@@ -13,54 +13,78 @@ export const addRating = async (req, res) => {
     const { itemId, shopId, rating, review } = req.body;
     const userId = req.userId;
 
-    // 1. Basic validation
     if (!itemId || !shopId || !rating) {
       return res.status(400).json({ message: "itemId, shopId and rating are required" });
     }
 
-    if (rating < 1 || rating > 5) {
+    if (!mongoose.Types.ObjectId.isValid(itemId) || !mongoose.Types.ObjectId.isValid(shopId)) {
+      return res.status(400).json({ message: "Invalid itemId or shopId" });
+    }
+
+    const parsedRating = Number(rating);
+    if (!Number.isFinite(parsedRating) || parsedRating < 1 || parsedRating > 5) {
       return res.status(400).json({ message: "Rating must be between 1 and 5" });
     }
 
-    // 2. Verify purchase
-    // FIX: old query used "shopOrders.shopOrderItems.item" — embedded subdocument path
-    // ShopOrder is now a separate collection — must query it directly
+    const cleanReview = typeof review === "string" ? review.trim() : "";
+    if (cleanReview && cleanReview.length < 3) {
+      return res.status(400).json({ message: "Review must be at least 3 characters or left empty" });
+    }
+
+    const itemObjectId = new mongoose.Types.ObjectId(itemId);
+    const shopObjectId = new mongoose.Types.ObjectId(shopId);
+
+    const itemDoc = await Item.findById(itemObjectId).select("_id shop");
+    if (!itemDoc) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    if (String(itemDoc.shop) !== String(shopObjectId)) {
+      return res.status(400).json({ message: "Item does not belong to the selected shop" });
+    }
+
+    const userOrderIds = await Order.find({ user: userId }).distinct("_id");
+    if (!userOrderIds.length) {
+      return res.status(403).json({ message: "You can only rate delivered items you have purchased" });
+    }
+
     const boughtShopOrder = await ShopOrder.findOne({
-      order: {
-        $in: await Order.find({ user: userId }).distinct("_id")
-      },
-      "items.item": new mongoose.Types.ObjectId(itemId)
+      order: { $in: userOrderIds },
+      shop: shopObjectId,
+      status: "Delivered",
+      "items.item": itemObjectId
     });
 
     if (!boughtShopOrder) {
       return res.status(403).json({
-        message: "You can only rate items you have purchased"
+        message: "You can only rate delivered items you have purchased"
       });
     }
 
-    // 3. Upsert rating
-    // FIX: added order field — it's required in ratingModel.js
-    const existingRating = await Rating.findOne({ user: userId, item: itemId });
+    const existingRating = await Rating.findOne({
+      user: userId,
+      item: itemObjectId,
+      order: boughtShopOrder.order
+    });
 
     if (existingRating) {
-      existingRating.rating = rating;
-      existingRating.review = review || null;
+      existingRating.rating = parsedRating;
+      existingRating.review = cleanReview || null;
+      existingRating.shop = shopObjectId;
       await existingRating.save();
     } else {
       await Rating.create({
-        user:   userId,
-        item:   itemId,
-        shop:   shopId,
-        order:  boughtShopOrder.order, // FIX: was missing — required field
-        rating,
-        review: review || null
+        user: userId,
+        item: itemObjectId,
+        shop: shopObjectId,
+        order: boughtShopOrder.order,
+        rating: parsedRating,
+        review: cleanReview || null
       });
     }
 
-    // 4. Recalculate item average rating
-    // FIX: added Number().toFixed(2) rounding — was storing 4.666666
     const itemStats = await Rating.aggregate([
-      { $match: { item: new mongoose.Types.ObjectId(itemId) } },
+      { $match: { item: itemObjectId } },
       {
         $group: {
           _id:           "$item",
@@ -75,14 +99,13 @@ export const addRating = async (req, res) => {
       : 0;
     const itemCount = itemStats.length > 0 ? itemStats[0].ratingCount : 0;
 
-    await Item.findByIdAndUpdate(itemId, {
+    await Item.findByIdAndUpdate(itemObjectId, {
       rating:      itemAvg,
       ratingCount: itemCount
     });
 
-    // 5. Recalculate shop average rating
     const shopStats = await Rating.aggregate([
-      { $match: { shop: new mongoose.Types.ObjectId(shopId) } },
+      { $match: { shop: shopObjectId } },
       {
         $group: {
           _id:           "$shop",
@@ -97,7 +120,7 @@ export const addRating = async (req, res) => {
       : 0;
     const shopCount = shopStats.length > 0 ? shopStats[0].ratingCount : 0;
 
-    await Shop.findByIdAndUpdate(shopId, {
+    await Shop.findByIdAndUpdate(shopObjectId, {
       rating:      shopAvg,
       ratingCount: shopCount
     });
@@ -105,12 +128,17 @@ export const addRating = async (req, res) => {
     return res.status(200).json({
       message:    "Rating submitted successfully",
       itemRating: itemAvg,
-      shopRating: shopAvg
+      itemRatingCount: itemCount,
+      shopRating: shopAvg,
+      shopRatingCount: shopCount
     });
 
   } catch (error) {
     console.error("ADD_RATING_ERR:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    if (error?.code === 11000) {
+      return res.status(409).json({ message: "Rating already exists for this order item" });
+    }
+    return res.status(500).json({ message: error.message || "Internal server error" });
   }
 };
 

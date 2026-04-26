@@ -96,7 +96,10 @@ const ShopMenuPage = () => {
                 <h1 className="text-4xl md:text-5xl font-black text-white mb-2">{shop.name}</h1>
                 <p className="text-white/80 text-lg flex items-center gap-2">
                   <Star size={18} fill="currentColor" className="text-yellow-400" />
-                  <span className="font-bold">{shop.rating || 'New'}</span>
+                  <span className="font-bold">
+                    {Number(shop.rating || 0) > 0 ? Number(shop.rating).toFixed(1) : 'New'}
+                    {Number(shop.ratingCount || 0) > 0 ? ` (${Number(shop.ratingCount)})` : ''}
+                  </span>
                   <span>•</span>
                   <span>{shop.address}</span>
                 </p>

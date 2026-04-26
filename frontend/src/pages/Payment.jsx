@@ -1009,7 +1009,7 @@ const Payment = () => {
           <button
             onClick={handlePlaceOrder}
             disabled={isProcessing}
-            className="w-full bg-gradient-to-rfrom-orange-600 to-[#ff4d2d] text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 transition-opacity active:scale-[0.99]"
+            className="w-full bg-gradient-to-r from-orange-600 to-[#ff4d2d] text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 transition-opacity active:scale-[0.99]"
           >
             {isProcessing
               ? "Processing..."

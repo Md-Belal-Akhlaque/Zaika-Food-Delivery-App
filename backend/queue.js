@@ -2,17 +2,61 @@ import { Queue } from "bullmq";
 import Redis from "ioredis";
 import net from "net";
 
-export const redisConnectionOptions = {
-  host: process.env.REDIS_HOST || "127.0.0.1",
-  port: Number(process.env.REDIS_PORT || 6380),
-  maxRetriesPerRequest: null
+const parseBoolean = (value) => String(value || "").trim().toLowerCase() === "true";
+
+const parseRedisConnectionFromUrl = (redisUrl) => {
+  try {
+    const parsedUrl = new URL(redisUrl);
+    const protocol = String(parsedUrl.protocol || "").replace(":", "").toLowerCase();
+
+    if (protocol !== "redis" && protocol !== "rediss") {
+      throw new Error("REDIS_URL must start with redis:// or rediss://");
+    }
+
+    const useTlsFromUrl = protocol === "rediss";
+    const username = parsedUrl.username ? decodeURIComponent(parsedUrl.username) : undefined;
+    const passwordFromUrl = parsedUrl.password
+      ? decodeURIComponent(parsedUrl.password)
+      : undefined;
+
+    return {
+      host: parsedUrl.hostname,
+      port: Number(parsedUrl.port || (useTlsFromUrl ? 6380 : 6379)),
+      username: username || undefined,
+      password: passwordFromUrl || process.env.REDIS_PASSWORD || undefined,
+      tls: useTlsFromUrl || parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
+      maxRetriesPerRequest: null
+    };
+  } catch (error) {
+    throw new Error(`Invalid REDIS_URL: ${error.message}`);
+  }
 };
+
+const buildRedisConnectionOptions = () => {
+  const redisUrl = String(process.env.REDIS_URL || "").trim();
+  if (redisUrl) {
+    return parseRedisConnectionFromUrl(redisUrl);
+  }
+
+  return {
+    host: process.env.REDIS_HOST || "127.0.0.1",
+    port: Number(process.env.REDIS_PORT || 6380),
+    password: process.env.REDIS_PASSWORD || undefined,
+    tls: parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
+    maxRetriesPerRequest: null
+  };
+};
+
+export const redisConnectionOptions = buildRedisConnectionOptions();
+const redisEndpointLabel = `${redisConnectionOptions.host}:${redisConnectionOptions.port}`;
+
+export const createRedisClient = () => new Redis(redisConnectionOptions);
 
 // FIX: Shared Redis connection with error handler
 // This prevents "missing 'error' handler" warnings
-export const redisConnection = new Redis(redisConnectionOptions);
+export const redisConnection = createRedisClient();
 redisConnection.on("error", (err) => {
-  console.error(`[REDIS] Global connection error (${redisConnectionOptions.host}:${redisConnectionOptions.port}): ${err.message}`);
+  console.error(`[REDIS] Global connection error (${redisEndpointLabel}): ${err.message}`);
 });
 
 let deliveryBroadcastQueue = null;
@@ -44,9 +88,12 @@ const getAdminAlertQueue = () => {
 
 export const isRedisReachable = (timeoutMs = 1500) =>
   new Promise((resolve) => {
+    const healthHost = redisConnectionOptions.host || "127.0.0.1";
+    const healthPort = Number(redisConnectionOptions.port || 6379);
+
     const socket = net.createConnection({
-      host: redisConnectionOptions.host,
-      port: redisConnectionOptions.port
+      host: healthHost,
+      port: healthPort
     });
 
     let settled = false;

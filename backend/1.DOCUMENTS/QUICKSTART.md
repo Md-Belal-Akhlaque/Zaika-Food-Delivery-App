@@ -34,6 +34,9 @@ CLIENT_URL=http://localhost:5173
 
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6380
+REDIS_URL=
+REDIS_PASSWORD=
+REDIS_TLS=false
 
 CLOUD_NAME=your_cloudinary_name
 CLOUD_APIKEY=your_cloudinary_api_key
@@ -60,6 +63,19 @@ Optional worker tuning:
 ENABLE_DELIVERY_WORKER=true
 DELIVERY_BROADCAST_CONCURRENCY=10
 ORDER_STOCK_HOLD_MINUTES=15
+```
+
+Managed Redis note (Render/Upstash):
+
+```env
+# Prefer this in production managed Redis setups
+REDIS_URL=rediss://default:<password>@<host>:<port>
+
+# Or use host/port mode with explicit auth/tls
+REDIS_HOST=<host>
+REDIS_PORT=<port>
+REDIS_PASSWORD=<password>
+REDIS_TLS=true
 ```
 
 ## 4. Start Redis

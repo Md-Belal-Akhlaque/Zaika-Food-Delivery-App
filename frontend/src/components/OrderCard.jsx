@@ -1,5 +1,5 @@
 import React from "react";
-import { Clock, CreditCard, MapPin, RotateCcw, Package, Truck } from "lucide-react";
+import { Clock, CreditCard, MapPin, RotateCcw, Package, Truck, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "../utility/cn";
 import { formatINR } from "../utility/cartPricing";
@@ -62,6 +62,25 @@ const OrderCard = ({ order }) => {
       addons: item.selectedAddons || item.addons || [],
     }))
   );
+
+  const ratingOrderPayload = {
+    id: order?.id,
+    originalOrderId: order?.originalOrderId || order?.id,
+    orderId: order?.orderId,
+    date: order?.date || order?.createdAt,
+    restaurant:
+      order?.restaurant ||
+      order?.shopName ||
+      shops.map((shop) => shop.shopName).join(", "),
+    shopId: order?.shopId || shops?.[0]?.shopId || null,
+    shops,
+    items: shops.flatMap((shop) =>
+      (shop.items || []).map((item) => ({
+        ...item,
+        shopId: item?.shopId || shop?.shopId || null,
+      }))
+    ),
+  };
 
   return (
     <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden transition hover:shadow-2xl">
@@ -169,7 +188,15 @@ const OrderCard = ({ order }) => {
           Order Again
         </button>
 
-        {!isDelivered && (
+        {isDelivered ? (
+          <button
+            className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 bg-emerald-600 text-white hover:bg-emerald-700 font-semibold"
+            onClick={() => navigate("/rate-order", { state: { order: ratingOrderPayload } })}
+          >
+            <Star className="w-4 h-4" />
+            Rate & Feedback
+          </button>
+        ) : (
           <button
             className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 bg-orange-500 text-white hover:bg-orange-600 font-semibold"
             onClick={() => navigate(`/track-order/${order.originalOrderId || order.id}`)}

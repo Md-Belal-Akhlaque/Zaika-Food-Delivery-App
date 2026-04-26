@@ -22,6 +22,7 @@ import mongoose from "mongoose";
 const shopOrderItemSchema = new mongoose.Schema({
   item:     { type: mongoose.Schema.Types.ObjectId, ref: "Item", required: true },
   name:     { type: String,  required: true },         // snapshot
+  image:    { type: String,  default: null },          // snapshot for stable order history cards
   price:    { type: Number,  required: true, min: 0 }, // snapshot — not live price
   prepTime: { type: Number,  default: 10 },            // snapshot of prepTime at order time
   quantity: { type: Number,  required: true, min: 1 },

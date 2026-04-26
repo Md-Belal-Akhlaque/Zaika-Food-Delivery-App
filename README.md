@@ -172,8 +172,11 @@ npm run dev
 | `JWT_SECRET` | Yes | - | JWT signing secret |
 | `CLIENT_URL` | No | `http://localhost:5173` | CORS frontend origin |
 | `FRONTEND_URL` | No | `CLIENT_URL` fallback | Socket CORS origin |
-| `REDIS_HOST` | No | `127.0.0.1` | Redis host |
-| `REDIS_PORT` | No | `6380` | Redis port |
+| `REDIS_URL` | No | - | Full Redis connection string (`redis://` or `rediss://`) for managed Redis |
+| `REDIS_HOST` | No | `127.0.0.1` | Redis host (used when `REDIS_URL` is not set) |
+| `REDIS_PORT` | No | `6380` | Redis port (used when `REDIS_URL` is not set) |
+| `REDIS_PASSWORD` | No | - | Redis password (optional for host/port mode, fallback if URL has no password) |
+| `REDIS_TLS` | No | `false` | Force TLS for host/port mode (`true` for managed Redis endpoints) |
 | `ENABLE_DELIVERY_WORKER` | No | `true` | Enable BullMQ workers |
 | `DELIVERY_BROADCAST_CONCURRENCY` | No | `10` | Worker concurrency |
 | `ORDER_STOCK_HOLD_MINUTES` | No | `15` | Stock hold window for online orders |
@@ -656,7 +659,7 @@ Note:
 
 ### Backend starts but no delivery assignments happen
 
-- Ensure Redis is reachable using configured `REDIS_HOST`/`REDIS_PORT`.
+- Ensure Redis is reachable using `REDIS_URL` (managed Redis) or `REDIS_HOST`/`REDIS_PORT`.
 - Check backend logs for worker startup messages.
 
 ### Frontend cannot reach API
@@ -690,3 +693,214 @@ Note:
 - Realtime setup notes: `backend/REALTIME_SETUP.md`
 - Frontend notes: `frontend/README.md`
 
+
+
+
+
+Primary entry files reviewed:
+server.js, app.js, socket.js, queue.js, workers/deliveryWorker.js.
+
+1. Architecture Breakdown
+
+Backend is layered as routes -> controllers -> services -> models, with middleware and utilities.
+Express app and middleware wiring live in app.js (line 19).
+HTTP server + Socket.IO + DB connect + worker bootstrap are in server.js (line 53).
+Queue producer code is in queue.js (line 113), queue consumers in deliveryWorker.js (line 271).
+Mongo models are normalized around Order + ShopOrder + DeliveryAssignment.
+Request flow:
+
+Client hits Express route in /api/* from app.js (line 32).
+Middleware handles auth/cookies/cors/rate-limit.
+Controller executes business rules.
+Services perform pricing/transactions/wallet logic.
+Models persist to MongoDB.
+For delivery-ready events, controller enqueues BullMQ jobs.
+Worker processes jobs, finds riders, emits socket events.
+Socket layer delivers role-targeted realtime events.
+Hourly cron in server.js (line 17) performs consistency cleanup.
+2. Core Components Analysis
+
+Express API:
+
+Route groups: auth, user, geo, shop, item, order, rating, delivery.
+Good modular split, but no centralized error middleware.
+CORS allows one origin string only, not multi-origin list.
+Authentication (JWT + cookies):
+
+Token issued on signup/signin and stored in httpOnly cookie in auth.controller.js (line 38).
+isAuth validates cookie or bearer token in isAuth.js (line 8).
+Major security issue: normal signup still accepts owner and deliveryPartner role directly in auth.controller.js (line 27), bypassing onboarding-code intent.
+MongoDB usage:
+
+Strong schema coverage with indices, geo fields, and normalized ShopOrder.
+Transactions used in key financial paths (good), especially delivery completion.
+Order model contains large legacy commented blocks that should be cleaned for maintainability.
+Redis usage:
+
+Used by BullMQ and Socket.IO adapter.
+Connection parsing supports REDIS_URL and host/port modes with optional TLS.
+Health check is raw TCP only, not auth/TLS-verified ping.
+BullMQ queues and workers:
+
+Queues: delivery-broadcast, admin-alerts.
+Worker performs round-based broadcast with escalating radius.
+admin-alert worker is effectively a no-op (async () => {}), so alerts are not truly processed.
+Socket.IO realtime flow:
+
+JWT-authenticated socket handshake.
+Room model for user/shop/deliveryPartner.
+Redis adapter enabled for multi-instance pub/sub.
+Worker depends on in-memory socket map for connected rider IDs, which couples worker logic to API instance memory.
+File uploads (Multer + Cloudinary):
+
+Multer writes temporary files to ./public, Cloudinary upload helper then deletes temp file.
+Good MIME + size limits.
+Risk: controllers assume Cloudinary upload success in some places and may dereference null.
+External services:
+
+Razorpay: order creation + signature verification implemented.
+Razorpay webhook verifies signature but does not update order state yet.
+Email (Nodemailer Gmail) used for OTP.
+Geoapify reverse geocode used in user city lookup.
+3. Redis Usage Deep Dive
+
+Where Redis is used:
+
+BullMQ queue/storage in queue.js (line 65).
+BullMQ workers in deliveryWorker.js (line 271).
+Socket.IO adapter pub/sub in socket.js (line 140).
+How BullMQ interacts with Redis:
+
+Queue adds deterministic job IDs (assignmentId:attempt) to prevent duplicate round jobs.
+Worker consumes with configurable concurrency.
+Uses shared ioredis connection for queues/workers.
+How Socket.IO uses Redis adapter:
+
+Creates pub/sub clients from same Redis options and registers createAdapter(pubClient, subClient).
+Enables cross-instance event propagation.
+Production structure assessment:
+
+Good base: URL/TLS/password support exists.
+Gaps:
+TCP-only health check can give false confidence.
+No robust connection lifecycle shutdown.
+Worker connectivity assumptions tied to local in-memory socket map reduce correctness across separate worker process or multi-instance topology.
+4. Worker System
+
+Is worker inside server or separate?
+
+Inside same process. startDeliveryWorker() is called from server.js (line 61).
+Is this safe for production?
+
+Safe for low scale/single instance.
+Risky for horizontal scaling because every web instance also runs workers and cron.
+Should it be split?
+
+Yes for production.
+Split into separate worker service/process, but first remove worker’s dependency on local socket maps (getConnectedDeliveryPartnerIds) and rely on DB/state-only criteria.
+5. Environment Variables (All Used)
+
+Used in code:
+
+APP_PASSWORD, CLIENT_URL, CLOUD_APIKEY, CLOUD_NAME, CLOUD_SECRET, DELIVERY_BROADCAST_CONCURRENCY, EMAIL, ENABLE_DELIVERY_WORKER, FRONTEND_URL, GEOAPIKEY, JWT_SECRET, MONGODB_URL, NODE_ENV, PORT, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_VERIFY_BYPASS, RAZORPAY_WEBHOOK_SECRET, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT, REDIS_TLS, REDIS_URL, STAFF_ONBOARDING_CODE.
+Required for baseline app:
+
+MONGODB_URL, JWT_SECRET.
+CLIENT_URL or FRONTEND_URL strongly recommended in production.
+Redis variables are effectively required for full realtime/queue behavior.
+Feature-conditional:
+
+Cloudinary: CLOUD_NAME, CLOUD_APIKEY, CLOUD_SECRET.
+OTP mail: EMAIL, APP_PASSWORD.
+Geo: GEOAPIKEY.
+Onboarding: STAFF_ONBOARDING_CODE.
+Razorpay: RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET.
+RAZORPAY_VERIFY_BYPASS should be disabled in production.
+Optional/tuning:
+
+PORT, NODE_ENV, ENABLE_DELIVERY_WORKER, DELIVERY_BROADCAST_CONCURRENCY.
+Redis connection shape: either REDIS_URL or host/port/password/tls set.
+Important note:
+
+ORDER_STOCK_HOLD_MINUTES exists in .env.example (line 13) but is not used in runtime code.
+6. Deployment Readiness Check
+
+What will break or behave incorrectly as-is:
+
+Owner cancel path can fail to persist shopOrder.status = Cancelled for COD/unpaid orders because save is skipped when refund short-circuits in order.controller.js (line 404).
+Public signup allows privileged roles directly (owner, deliveryPartner) in auth.controller.js (line 27).
+Webhook verifies signature but does not update order/payment state in webhook.routes.js (line 24).
+Package scripts reference missing files: tests/realtime/migration scripts in package.json (line 12).
+Upload controllers can crash if Cloudinary returns null (null dereference risk in user/item/shop controllers).
+CORS origin mismatch risk: app prefers CLIENT_URL first, socket prefers FRONTEND_URL first.
+Render deployment changes needed:
+
+Separate Web service and Worker service.
+Ensure only worker service runs BullMQ consumers and cron (or gate cron by env).
+Set exact production frontend origin envs and keep HTTP + socket origin aligned.
+Use persistent logs/monitoring for queue failures.
+Upstash Redis changes needed:
+
+Use REDIS_URL=rediss://... as primary.
+Improve health check from raw TCP to authenticated Redis ping.
+Verify connection limits for socket adapter + queue + workers.
+MongoDB Atlas changes needed:
+
+Set MONGODB_URL Atlas URI and network allowlist.
+Ensure required indexes build cleanly on first startup.
+Keep replica-set capable cluster for transactions (Atlas supports this).
+7. Risk & Issues
+
+Scalability:
+
+Worker + cron in web process leads duplicate processing when scaled horizontally.
+Wallet transaction arrays in single wallet docs grow unbounded (document bloat risk over time).
+getOwnerOrders does per-order geospatial count query (N+1 heavy).
+Performance:
+
+Synchronous fs.unlinkSync in request path.
+Broad cron scan every hour over assignments.
+Multiple large commented legacy blocks increase maintenance and audit difficulty.
+Security:
+
+Privilege escalation via signup role.
+RAZORPAY_VERIFY_BYPASS flag present; if enabled in prod, payment signature checks can be bypassed.
+No Helmet/security hardening middleware.
+OTP stored plaintext in DB.
+Memory leaks / infinite loops:
+
+No obvious infinite loop found.
+Socket maps are cleaned on disconnecting; acceptable.
+Temp file leak possible when multer writes file but downstream validation fails before Cloudinary cleanup.
+Incorrect async/consistency handling:
+
+acceptDeliveryAssignment does not wrap all dependent updates in one transaction, so partial state inconsistency is possible under race/failure.
+Server starts listening before DB connect completes.
+Silent catch {} blocks in image replacement paths swallow errors.
+8. Required Changes for Production (No Code Implemented Yet)
+
+Redis config fixes:
+
+Replace TCP health check with authenticated Redis ping.
+Standardize on REDIS_URL for managed Redis and keep TLS handling explicit.
+Add graceful Redis client shutdown on SIGTERM/SIGINT.
+Worker separation:
+
+Move BullMQ workers to a dedicated worker process/service.
+Gate cron so it runs in one place only.
+Remove worker dependency on local socket memory for candidate logic.
+Socket fixes:
+
+Unify CORS origin precedence between HTTP and Socket.IO.
+Add socket event rate limiting / payload validation.
+Close adapter Redis clients explicitly on shutdown.
+CORS/cookie issues:
+
+Keep one canonical frontend origin variable or explicit allowlist.
+Ensure frontend uses credentials: true everywhere with cookie auth.
+Verify production sameSite=None + HTTPS end-to-end behavior.
+File upload issues:
+
+Add null-check guards after Cloudinary upload returns.
+Ensure temp-file cleanup on validation failures after multer.
+Consider memory storage/streamed upload to avoid disk dependency.

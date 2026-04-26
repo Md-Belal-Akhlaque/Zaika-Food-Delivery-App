@@ -342,7 +342,9 @@ export const getAllShopItemsForMenu = async (req, res) => {
         name: shop.name,
         image: shop.image,
         address: shop.address,
-        city: shop.city
+        city: shop.city,
+        rating: Number(shop.rating || 0),
+        ratingCount: Number(shop.ratingCount || 0)
       }
     });
 
@@ -380,7 +382,6 @@ export const getMyShopItems = async (req, res) => {
     });
   }
 };
-
 
 
 

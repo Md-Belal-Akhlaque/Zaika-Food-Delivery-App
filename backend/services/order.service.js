@@ -694,6 +694,7 @@ export const groupItemsByShop = async (cartItems, session = null) => {
     map[shopId].items.push({
       item:     item._id,
       name:     item.name,
+      image:    item.image || null,
       price:    finalUnitPrice,
       prepTime: item.prepTime || 10,
       quantity: ci.quantity,

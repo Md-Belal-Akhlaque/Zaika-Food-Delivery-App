@@ -1,12 +1,11 @@
 import { Server } from "socket.io";
 import { createAdapter } from "@socket.io/redis-adapter";
-import Redis from "ioredis";
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import DeliveryAssignment from "./models/deliveryAssignmentModel.js";
 import Order from "./models/orderModel.js";
 import Shop from "./models/shopModel.js";
-import { redisConnectionOptions } from "./queue.js";
+import { createRedisClient, redisConnectionOptions } from "./queue.js";
 
 let io;
 const DELIVERY_PARTNER_ROOM = "deliveryPartner";
@@ -138,10 +137,15 @@ export const initSocket = (server) => {
     transports: ["websocket", "polling"]
   });
 
-  const pubClient = new Redis(redisConnectionOptions);
+  const pubClient = createRedisClient();
   const subClient = pubClient.duplicate();
-  pubClient.on("error", (err) => console.error("[SOCKET] Redis Pub error:", err.message));
-  subClient.on("error", (err) => console.error("[SOCKET] Redis Sub error:", err.message));
+  const endpointLabel = `${redisConnectionOptions.host}:${redisConnectionOptions.port}`;
+  pubClient.on("error", (err) =>
+    console.error(`[SOCKET] Redis Pub error (${endpointLabel}):`, err.message)
+  );
+  subClient.on("error", (err) =>
+    console.error(`[SOCKET] Redis Sub error (${endpointLabel}):`, err.message)
+  );
   io.adapter(createAdapter(pubClient, subClient));
 
   io.use((socket, next) => {
