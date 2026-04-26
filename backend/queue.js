@@ -3,6 +3,21 @@ import Redis from "ioredis";
 
 const parseBoolean = (value) => String(value || "").trim().toLowerCase() === "true";
 
+// ✅ Upstash on Render requires rejectUnauthorized: false
+const buildTlsOptions = () => ({
+  rejectUnauthorized: false,
+});
+
+const retryStrategy = (times) => {
+  if (times > 5) {
+    console.error("[REDIS] Max retries reached, stopping reconnection attempts");
+    return null;
+  }
+  const delay = Math.min(times * 500, 3000);
+  console.warn(`[REDIS] Retrying connection in ${delay}ms (attempt ${times})`);
+  return delay;
+};
+
 const parseRedisConnectionFromUrl = (redisUrl) => {
   try {
     const parsedUrl = new URL(redisUrl);
@@ -12,7 +27,7 @@ const parseRedisConnectionFromUrl = (redisUrl) => {
       throw new Error("REDIS_URL must start with redis:// or rediss://");
     }
 
-    const useTlsFromUrl = protocol === "rediss";
+    const useTls = protocol === "rediss";
     const username = parsedUrl.username ? decodeURIComponent(parsedUrl.username) : undefined;
     const passwordFromUrl = parsedUrl.password
       ? decodeURIComponent(parsedUrl.password)
@@ -23,14 +38,12 @@ const parseRedisConnectionFromUrl = (redisUrl) => {
       port: Number(parsedUrl.port || 6379),
       username: username || undefined,
       password: passwordFromUrl || process.env.REDIS_PASSWORD || undefined,
-      tls: useTlsFromUrl || parseBoolean(process.env.REDIS_TLS) ? {} : undefined,
+      tls: useTls ? buildTlsOptions() : undefined,
       maxRetriesPerRequest: null,
       enableReadyCheck: false,
-      lazyConnect: false,
-      retryStrategy: (times) => {
-        if (times > 5) return null; // Stop retrying after 5 attempts
-        return Math.min(times * 500, 3000);
-      },
+      connectTimeout: 10000,
+      keepAlive: 30000,
+      retryStrategy,
     };
   } catch (error) {
     throw new Error(`Invalid REDIS_URL: ${error.message}`);
@@ -51,14 +64,12 @@ const buildRedisConnectionOptions = () => {
     host: process.env.REDIS_HOST,
     port: Number(process.env.REDIS_PORT || 6379),
     password: process.env.REDIS_PASSWORD || undefined,
-    tls: useTls ? {} : undefined,
+    tls: useTls ? buildTlsOptions() : undefined,
     maxRetriesPerRequest: null,
     enableReadyCheck: false,
-    lazyConnect: false,
-    retryStrategy: (times) => {
-      if (times > 5) return null;
-      return Math.min(times * 500, 3000);
-    },
+    connectTimeout: 10000,
+    keepAlive: 30000,
+    retryStrategy,
   };
 };
 
@@ -79,13 +90,13 @@ export const createRedisClient = () => {
   return client;
 };
 
-// Shared Redis connection for BullMQ
+// Shared connection for BullMQ queues
 export const redisConnection = createRedisClient();
 redisConnection.on("error", (err) => {
   console.error(`[REDIS] Global connection error (${redisEndpointLabel}): ${err.message}`);
 });
 
-// ✅ Fixed: Uses PING instead of raw TCP (works with TLS/Upstash)
+// ✅ PING-based health check — works with TLS, no raw TCP
 export const isRedisReachable = async (timeoutMs = 3000) => {
   let testClient = null;
   try {
@@ -93,8 +104,8 @@ export const isRedisReachable = async (timeoutMs = 3000) => {
       ...redisConnectionOptions,
       lazyConnect: true,
       connectTimeout: timeoutMs,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null, // No retries for health check
+      maxRetriesPerRequest: 0,
+      retryStrategy: () => null,
     });
 
     await Promise.race([
@@ -109,9 +120,9 @@ export const isRedisReachable = async (timeoutMs = 3000) => {
     console.warn(`[REDIS] Health check failed: ${err.message}`);
     return false;
   } finally {
-    if (testClient) {
-      testClient.disconnect();
-    }
+    try {
+      if (testClient) testClient.disconnect();
+    } catch (_) {}
   }
 };
 
@@ -152,9 +163,7 @@ const getAdminAlertQueue = () => {
 
 export const enqueueBroadcast = async (assignmentId, attemptNumber = 1) => {
   try {
-    if (!assignmentId) {
-      throw new Error("assignmentId is required for enqueueBroadcast");
-    }
+    if (!assignmentId) throw new Error("assignmentId is required for enqueueBroadcast");
 
     const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
     const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
@@ -163,12 +172,10 @@ export const enqueueBroadcast = async (assignmentId, attemptNumber = 1) => {
     const existingJob = await queue.getJob(deterministicJobId);
     if (existingJob) {
       const state = await existingJob.getState();
-      if (state !== "active") {
-        await existingJob.remove();
-      }
+      if (state !== "active") await existingJob.remove();
     }
 
-    const job = await queue.add(
+    return await queue.add(
       "broadcast-assignment",
       { assignmentId, attemptNumber: normalizedAttempt },
       {
@@ -178,8 +185,6 @@ export const enqueueBroadcast = async (assignmentId, attemptNumber = 1) => {
         delay: 0,
       }
     );
-
-    return job;
   } catch (error) {
     console.error(
       `[QUEUE] Failed to enqueue delivery broadcast: assignment=${assignmentId} attempt=${attemptNumber}`,
@@ -195,15 +200,13 @@ export const enqueueBroadcastWithDelay = async (
   delayMs = 15000
 ) => {
   try {
-    if (!assignmentId) {
-      throw new Error("assignmentId is required for enqueueBroadcastWithDelay");
-    }
+    if (!assignmentId) throw new Error("assignmentId is required for enqueueBroadcastWithDelay");
 
     const normalizedAttempt = Math.max(1, Number(attemptNumber) || 1);
     const normalizedDelay = Math.max(0, Number(delayMs) || 0);
     const deterministicJobId = `${assignmentId}:${normalizedAttempt}`;
 
-    const job = await getDeliveryBroadcastQueue().add(
+    return await getDeliveryBroadcastQueue().add(
       "broadcast-assignment",
       { assignmentId, attemptNumber: normalizedAttempt },
       {
@@ -213,8 +216,6 @@ export const enqueueBroadcastWithDelay = async (
         delay: normalizedDelay,
       }
     );
-
-    return job;
   } catch (error) {
     console.error(
       `[QUEUE] Failed to enqueue delayed delivery broadcast: assignment=${assignmentId} attempt=${attemptNumber}`,
@@ -226,11 +227,11 @@ export const enqueueBroadcastWithDelay = async (
 
 export const enqueueAdminAlert = async (type, data = {}) => {
   try {
-    const job = await getAdminAlertQueue().add(
-      "admin-alert",
-      { type, data, timestamp: new Date().toISOString() }
-    );
-    return job;
+    return await getAdminAlertQueue().add("admin-alert", {
+      type,
+      data,
+      timestamp: new Date().toISOString(),
+    });
   } catch (error) {
     console.error(`[QUEUE] Failed to enqueue admin alert: type=${type}`, error);
     throw error;

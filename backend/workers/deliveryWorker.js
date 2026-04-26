@@ -7,9 +7,22 @@ import {
   enqueueAdminAlert,
   enqueueBroadcastWithDelay,
   isRedisReachable,
-  redisConnection
+  redisConnectionOptions, // ✅ use options, not shared connection
 } from "../queue.js";
+import Redis from "ioredis";
 
+// ✅ Workers need their OWN dedicated connections (BullMQ requirement)
+// Sharing redisConnection between Queue + Worker causes ECONNRESET
+const createWorkerRedisClient = () => {
+  const client = new Redis({
+    ...redisConnectionOptions,
+    maxRetriesPerRequest: null, // Required by BullMQ
+  });
+  client.on("error", (err) => {
+    console.error(`[WORKER-REDIS] Connection error: ${err.message}`);
+  });
+  return client;
+};
 
 const ROUND_WAIT_MS = 15 * 1000;
 const BATCH_CONFIG = {
@@ -194,9 +207,7 @@ const processBroadcastRound = async (assignment, round) => {
     await assignment.save();
   }
 
-  if (assignment.assignmentStatus !== "unassigned") {
-    return;
-  }
+  if (assignment.assignmentStatus !== "unassigned") return;
 
   const coordinates = assignment.pickupLocation?.coordinates;
   if (!Array.isArray(coordinates) || coordinates.length !== 2) {
@@ -260,16 +271,15 @@ const processBroadcastRound = async (assignment, round) => {
     "assignmentStatus"
   );
   if (freshAssignment?.assignmentStatus === "unassigned") {
-    await enqueueBroadcastWithDelay(
-      assignment._id.toString(),
-      round + 1,
-      ROUND_WAIT_MS
-    );
+    await enqueueBroadcastWithDelay(assignment._id.toString(), round + 1, ROUND_WAIT_MS);
   }
 };
 
-const startBroadcastWorker = () =>
-  new Worker(
+const startBroadcastWorker = () => {
+  // ✅ Fresh dedicated connection for this worker
+  const connection = createWorkerRedisClient();
+
+  const worker = new Worker(
     "delivery-broadcast",
     async (job) => {
       const assignmentId = job.data?.assignmentId;
@@ -302,32 +312,36 @@ const startBroadcastWorker = () =>
       await processBroadcastRound(assignment, attemptNumber);
     },
     {
-      connection: redisConnection,
+      connection,
       concurrency: Number(process.env.DELIVERY_BROADCAST_CONCURRENCY || 10)
     }
   );
 
-const startAdminAlertWorker = () =>
-  new Worker(
+  return worker;
+};
+
+const startAdminAlertWorker = () => {
+  // ✅ Fresh dedicated connection for this worker
+  const connection = createWorkerRedisClient();
+
+  return new Worker(
     "admin-alerts",
     async () => {},
     {
-      connection: redisConnection,
+      connection,
       concurrency: 1
     }
   );
+};
 
 export const startDeliveryWorker = async () => {
   if (String(process.env.ENABLE_DELIVERY_WORKER || "true").toLowerCase() === "false") {
     return { broadcastWorker: null, adminAlertWorker: null };
   }
 
-  const redisUp = await isRedisReachable(2000);
+  const redisUp = await isRedisReachable(3000);
   if (!redisUp) {
     console.error("[WORKER] Redis unavailable. Delivery workers not started.");
-    console.error(
-      "[WORKER] Start Redis (or fix REDIS_HOST/REDIS_PORT) and restart backend to enable queue processing."
-    );
     return { broadcastWorker: null, adminAlertWorker: null };
   }
 
@@ -335,22 +349,20 @@ export const startDeliveryWorker = async () => {
   const adminAlertWorker = startAdminAlertWorker();
 
   broadcastWorker.on("failed", (job, error) => {
-    console.error(
-      `[WORKER] delivery-broadcast failed jobId=${job?.id} error=${error.message}`
-    );
+    console.error(`[WORKER] delivery-broadcast failed jobId=${job?.id} error=${error.message}`);
   });
   broadcastWorker.on("error", (error) => {
     console.error(`[WORKER] delivery-broadcast worker error: ${error.message}`);
   });
 
   adminAlertWorker.on("failed", (job, error) => {
-    console.error(
-      `[WORKER] admin-alert failed jobId=${job?.id} error=${error.message}`
-    );
+    console.error(`[WORKER] admin-alert failed jobId=${job?.id} error=${error.message}`);
   });
   adminAlertWorker.on("error", (error) => {
     console.error(`[WORKER] admin-alert worker error: ${error.message}`);
   });
+
+  console.log("[WORKER] Delivery workers started successfully");
 
   const shutdown = async () => {
     await Promise.all([broadcastWorker.close(), adminAlertWorker.close()]);
