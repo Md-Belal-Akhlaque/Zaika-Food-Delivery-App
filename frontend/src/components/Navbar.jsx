@@ -39,7 +39,7 @@ const Navbar = () => {
           className="text-2xl md:text-3xl font-extrabold tracking-wide text-[#ff4d2d] cursor-pointer"
           onClick={() => navigate("/")}
         >
-          Zaika <span className="text-gray-800 italic">King</span>
+          Zai <span className="text-gray-800 italic">Ka</span>
         </h1>
 
         <div className="hidden md:flex items-center gap-4 w-[45%]">

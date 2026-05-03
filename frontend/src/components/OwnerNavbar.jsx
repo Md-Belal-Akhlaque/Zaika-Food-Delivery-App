@@ -50,7 +50,7 @@ const OwnerNavbar = () => {
           <Store size={26} className="text-[#ff4d2d]" />
           <div className="flex flex-col leading-tight">
             <span className="text-xl md:text-2xl font-extrabold tracking-wide text-[#ff4d2d]">
-              Zaika <span className="text-gray-800 italic">Owner</span>
+              Shop <span className="text-gray-800 italic">Owner</span>
             </span>
             <span className="text-[11px] text-gray-500">
               Restaurant Panel
