@@ -198,7 +198,7 @@ export const deleteShop = async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // ✅ Prevent delete if active orders exist
+    //  Prevent delete if active orders exist
     const activeOrders = await ShopOrder.find({
       shop: shop._id,
       status: { $in: ["Pending", "Accepted", "Preparing"] }
