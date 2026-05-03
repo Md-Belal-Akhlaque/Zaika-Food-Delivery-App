@@ -2,18 +2,18 @@ import express from "express";
 import { isAuth } from "../middleware/isAuth.js";
 import { upload } from "../middleware/multer.js";
 import { validate } from "../middleware/validate.js";
-import { 
-  saveAddressSchema, 
-  updateProfileSchema, 
-  updateLocationSchema 
+import {
+  saveAddressSchema,
+  updateProfileSchema,
+  updateLocationSchema
 } from "../validations/user.validation.js";
-import { 
-  getCurrentUser, 
-  saveAddress, 
-  getAddresses, 
-  deleteAddress, 
+import {
+  getCurrentUser,
+  saveAddress,
+  getAddresses,
+  deleteAddress,
   updateLocation,
-  updateProfile 
+  updateProfile
 } from "../controllers/user.controller.js";
 
 const userRouter = express.Router();

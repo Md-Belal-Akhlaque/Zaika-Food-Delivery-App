@@ -3,7 +3,7 @@ import Redis from "ioredis";
 
 const parseBoolean = (value) => String(value || "").trim().toLowerCase() === "true";
 
-// ✅ Upstash on Render requires rejectUnauthorized: false
+//  Upstash on Render requires rejectUnauthorized: false
 const buildTlsOptions = () => ({
   rejectUnauthorized: false,
 });
@@ -97,7 +97,7 @@ redisConnection.on("error", (err) => {
   console.error(`[REDIS] Global connection error (${redisEndpointLabel}): ${err.message}`);
 });
 
-// ✅ PING-based health check — works with TLS, no raw TCP
+//  PING-based health check — works with TLS, no raw TCP
 export const isRedisReachable = async (timeoutMs = 3000) => {
   let testClient = null;
   try {

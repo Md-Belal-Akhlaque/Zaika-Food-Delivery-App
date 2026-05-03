@@ -7,11 +7,11 @@ import {
   enqueueAdminAlert,
   enqueueBroadcastWithDelay,
   isRedisReachable,
-  redisConnectionOptions, // ✅ use options, not shared connection
+  redisConnectionOptions, // use options, not shared connection
 } from "../queue.js";
 import Redis from "ioredis";
 
-// ✅ Workers need their OWN dedicated connections (BullMQ requirement)
+//  Workers need their OWN dedicated connections (BullMQ requirement)
 // Sharing redisConnection between Queue + Worker causes ECONNRESET
 const createWorkerRedisClient = () => {
   const client = new Redis({
@@ -276,7 +276,7 @@ const processBroadcastRound = async (assignment, round) => {
 };
 
 const startBroadcastWorker = () => {
-  // ✅ Fresh dedicated connection for this worker
+  //  Fresh dedicated connection for this worker
   const connection = createWorkerRedisClient();
 
   const worker = new Worker(
@@ -321,7 +321,7 @@ const startBroadcastWorker = () => {
 };
 
 const startAdminAlertWorker = () => {
-  // ✅ Fresh dedicated connection for this worker
+  //  Fresh dedicated connection for this worker
   const connection = createWorkerRedisClient();
 
   return new Worker(

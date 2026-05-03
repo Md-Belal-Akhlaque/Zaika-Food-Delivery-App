@@ -34,7 +34,7 @@ const itemSchema = new mongoose.Schema(
       default: null,
       min: 0, // added: prevent negative discount prices
 
-      // ✅ FIX: discount > price na ho
+      //  FIX: discount > price na ho
       validate: {
         validator: function (val) {
           if (val === null) return true;

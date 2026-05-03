@@ -111,25 +111,6 @@ userSchema.index(
   { unique: true, collation: { locale: "en", strength: 2 } }
 );
 
-//  FIX: password hashing + role cleanup
-// userSchema.pre("save", async function (next) {
-//   if (this.isModified("password") && this.password) {
-//     this.password = await bcrypt.hash(this.password, 10);
-//   }
-
-  // only delivery partner should have location
-//   if (this.role !== "deliveryPartner") {
-//     this.location = undefined;
-//     this.isAvailable = false;
-//   }
-
-//   next();
-// });
-
-//  helper method
-// userSchema.methods.comparePassword = function (password) {
-//   return bcrypt.compare(password, this.password);
-// };
 
 export default mongoose.model("User", userSchema);
 

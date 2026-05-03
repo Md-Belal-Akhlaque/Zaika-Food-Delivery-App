@@ -21,7 +21,7 @@ const app = express();
 app.use("/webhooks", webhookRouter); // Must be BEFORE express.json()
 app.use(express.json());
 
-// ✅ CORS — both localhost and Vercel allowed
+//  CORS — both localhost and Vercel allowed
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
@@ -44,7 +44,7 @@ app.use(cookieParser());
 
 // Health check
 app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "Zaika API is running 🚀" });
+  res.json({ status: "ok", message: "Zaika API is running " });
 });
 
 app.use('/api/auth', authLimiter, authRouter);

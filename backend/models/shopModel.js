@@ -24,7 +24,7 @@ const shopSchema = new mongoose.Schema(
     // When a shop has 200 items, every Shop.findById() was loading 200 ObjectIds.
     // Adding/removing an item rewrote the entire shop document.
     // Items already have shop:ObjectId on them — use Item.find({ shop: shopId }) instead.
-    // ❌ items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Item" }]
+    //  items: [{ type: mongoose.Schema.Types.ObjectId, ref: "Item" }]
 
     // Ratings
     // FIX: added min/max constraints — a $set:{rating:999} can no longer corrupt this

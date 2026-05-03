@@ -1,6 +1,6 @@
 ﻿import mongoose from "mongoose";
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
 // WHY shopOrderSchema was moved OUT of this file:
 //
 // The original code embedded shopOrders as subdocuments inside Order.
@@ -17,7 +17,6 @@
 //
 // FIX: ShopOrder is now its own collection in shopOrderModel.js
 //      Order.shopOrders is now an array of ObjectId references, not subdocuments.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const orderSchema = new mongoose.Schema(
   {
@@ -78,7 +77,7 @@ const orderSchema = new mongoose.Schema(
     },
     paymentStatus: {
       type: String,
-      // Added "Refunded" â€” needed for cancellation flows
+      // Added "Refunded"  needed for cancellation flows
       enum: ["Pending", "Paid", "Failed", "Refunded"],
       default: "Pending"
     },
@@ -94,7 +93,7 @@ const orderSchema = new mongoose.Schema(
     stockReleasedAt: { type: Date, default: null },
     stockReleaseReason: { type: String, default: null },
 
-    // Overall order status â€” derived from all ShopOrder statuses
+    // Overall order status  derived from all ShopOrder statuses
     // Updated enum to reflect multi-shop reality:
     // PartiallyReady = some shops ready, others still preparing
     // AllReady       = all shops ready, waiting for all delivery partners
@@ -139,215 +138,3 @@ orderSchema.index({
 orderSchema.index({ orderStatus: 1, createdAt: -1 });
 
 export default mongoose.model("Order", orderSchema);
-
-
-
-
-
-
-
-
-
-
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// shopOrderModel.js â€” MUST be a separate file in your models folder
-//
-// Create: backend/models/shopOrderModel.js
-// And paste the content below into it.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// ============================================================
-// COPY EVERYTHING BELOW INTO: models/shopOrderModel.js
-// ============================================================
-
-/*
-import mongoose from "mongoose";
-
-// Item snapshot â€” price locked at order time
-const shopOrderItemSchema = new mongoose.Schema({
-  item:     { type: mongoose.Schema.Types.ObjectId, ref: "Item", required: true },
-  name:     { type: String,  required: true },         // snapshot of item name
-  price:    { type: Number,  required: true, min: 0 }, // snapshot of price â€” NEVER live price
-  quantity: { type: Number,  required: true, min: 1 },
-  variants: { type: Array,   default: [] },
-  addons:   { type: Array,   default: [] }
-}, { _id: false });
-
-const shopOrderSchema = new mongoose.Schema(
-  {
-    // Link back to parent order
-    order: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Order",
-      required: true
-    },
-
-    // Which shop fulfills this part
-    shop: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Shop",
-      required: true
-    },
-
-    // Shop owner (for quick owner-level queries without populating shop)
-    owner: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
-
-    // Snapshotted items
-    items: [shopOrderItemSchema],
-
-    // This shop's portion of the total
-    subtotal: { type: Number, required: true, min: 0 },
-
-    // Status lifecycle â€” each shop moves independently
-    status: {
-      type: String,
-      enum: [
-        "Pending",         // waiting for shop to accept
-        "Accepted",        // shop accepted
-        "Preparing",       // kitchen working on it
-        "Ready",           // food ready, waiting for delivery partner
-        "OutForDelivery",  // delivery partner picked up
-        "Delivered",       // delivered to customer
-        "Cancelled"
-      ],
-      default: "Pending"
-    },
-
-    // Linked delivery assignment (set when broadcast is triggered)
-    deliveryAssignment: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "DeliveryAssignment",
-      default: null
-    },
-
-    // Per-status timestamps
-    acceptedAt:       { type: Date, default: null },
-    preparingAt:      { type: Date, default: null },
-    readyAt:          { type: Date, default: null },
-    outForDeliveryAt: { type: Date, default: null },
-    deliveredAt:      { type: Date, default: null },
-    cancelledAt:      { type: Date, default: null },
-
-    cancellationReason: { type: String, default: null }
-  },
-  { timestamps: true }
-);
-
-// "All pending orders for this shop" â€” shop dashboard's most common query
-shopOrderSchema.index({ shop: 1, status: 1 });
-
-// "All ShopOrders for this parent order" â€” used when populating order detail
-shopOrderSchema.index({ order: 1 });
-
-// "All orders for this owner" â€” owner history page
-shopOrderSchema.index({ owner: 1, status: 1, createdAt: -1 });
-
-// "Which ShopOrder is linked to this delivery?"
-shopOrderSchema.index({ deliveryAssignment: 1 });
-
-export default mongoose.model("ShopOrder", shopOrderSchema);
-*/
-
-
-
-
-
-// import mongoose from "mongoose";
-
-// /* ---------------- SHOP ORDER ITEMS ---------------- */
-// const shopOrderItemSchema = new mongoose.Schema({
-//   name: String,
-//   item: { type: mongoose.Schema.Types.ObjectId, ref: "Item", required: true },
-//   price: Number,
-//   quantity: Number,
-//   variants: [], // Array of selected variants
-//   addons: []    // Array of selected addons
-// });
-
-// /* ---------------- SHOP ORDER (per shop) ---------------- */
-// const shopOrderSchema = new mongoose.Schema({
-//   shop: { type: mongoose.Schema.Types.ObjectId, ref: "Shop" },
-//   owner: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-//   subtotal: Number,
-//   earningsForShop: Number,
-
-//   status: {
-//     type: String,
-//     enum: ["Pending", "Accepted", "Preparing", "Ready", "Out for delivery", "Delivered", "Cancelled"],
-//     default: "Pending"
-//   },
-
-//   //  UPDATED: Renamed from "assignment" to "deliveryAssignmentId"
-//   deliveryAssignmentId: { 
-//     type: mongoose.Schema.Types.ObjectId, 
-//     ref: "DeliveryAssignment",
-//     default: null 
-//   },
-
-//   //  NEW: Track which delivery partner is assigned
-//   deliveryPartner: { 
-//     type: mongoose.Schema.Types.ObjectId, 
-//     ref: "User",
-//     default: null 
-//   },
-
-//   //  NEW: Timestamp tracking for each status
-//   acceptedAt: Date,
-//   preparingAt: Date,
-//   readyAt: Date,
-//   outForDeliveryAt: Date,
-//   deliveredAt: Date,
-//   cancelledAt: Date,
-
-//   shopOrderItems: [shopOrderItemSchema]
-// });
-
-// /* ---------------- MAIN ORDER ---------------- */
-// const orderSchema = new mongoose.Schema(
-//   {
-//     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-
-//     deliveryAddress: {
-//       text: String,
-//       landmark: String,
-//       latitude: Number,
-//       longitude: Number
-//     },
-
-//     itemsTotal: Number,
-//     deliveryFee: Number,
-//     totalAmount: Number,
-
-//     // Payment
-//     paymentMethod: {
-//       type: String,
-//       enum: ["cod"],
-//       required: true
-//     },
-//     paymentStatus: {
-//       type: String,
-//       enum: ["Pending", "Paid", "Failed"],
-//       default: "Pending"
-//     },
-
-//     orderStatus: {
-//       type: String,
-//       enum: ["Pending", "Processing", "Ready", "Pickup", "Delivered", "Cancelled"],
-//       default: "Pending"
-//     },
-
-//     shopOrders: [shopOrderSchema]
-//   },
-//   { timestamps: true }
-// );
-
-// export default mongoose.model("Order", orderSchema);
-
-
-

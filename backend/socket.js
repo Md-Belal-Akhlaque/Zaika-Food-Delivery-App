@@ -5,7 +5,7 @@ import DeliveryAssignment from "./models/deliveryAssignmentModel.js";
 import Order from "./models/orderModel.js";
 import Shop from "./models/shopModel.js";
 
-// ✅ Redis adapter REMOVED — not needed on single Render instance
+//  Redis adapter REMOVED — not needed on single Render instance
 // Redis adapter is only required when running multiple server instances (horizontal scaling)
 // Using Socket.io's built-in in-memory adapter instead — zero extra Redis connections
 
@@ -138,7 +138,7 @@ export const initSocket = (server) => {
     transports: ["websocket", "polling"]
   });
 
-  // ✅ No Redis adapter — in-memory adapter is used automatically
+  // No Redis adapter — in-memory adapter is used automatically
   // This removes 2 Redis connections (pubClient + subClient)
 
   io.use((socket, next) => {

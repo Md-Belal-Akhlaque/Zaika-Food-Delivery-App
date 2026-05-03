@@ -47,7 +47,7 @@ cron.schedule("0 * * * *", async () => {
   }
 });
 
-// ✅ Correct startup order: DB first, then server, then workers
+//  Correct startup order: DB first, then server, then workers
 const start = async () => {
   try {
     // 1. Connect to MongoDB first
