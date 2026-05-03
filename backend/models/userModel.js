@@ -34,7 +34,7 @@ const userSchema = new mongoose.Schema(
     mobile: { 
       type: String, 
       required: true,
-      unique: true // ✅ FIX: prevent duplicate numbers
+      unique: true // FIX: prevent duplicate numbers
     },
 
     role: {
@@ -105,13 +105,13 @@ userSchema.index({ resetOtp: 1 }, { sparse: true });
 userSchema.index({ role: 1, isAvailable: 1, isActive: 1 });
 userSchema.index({ role: 1, isBusy: 1, isActive: 1 });
 
-// ✅ FIX: case-insensitive email uniqueness
+//  FIX: case-insensitive email uniqueness
 userSchema.index(
   { email: 1 },
   { unique: true, collation: { locale: "en", strength: 2 } }
 );
 
-// ✅ FIX: password hashing + role cleanup
+//  FIX: password hashing + role cleanup
 // userSchema.pre("save", async function (next) {
 //   if (this.isModified("password") && this.password) {
 //     this.password = await bcrypt.hash(this.password, 10);
@@ -126,7 +126,7 @@ userSchema.index(
 //   next();
 // });
 
-// ✅ helper method
+//  helper method
 // userSchema.methods.comparePassword = function (password) {
 //   return bcrypt.compare(password, this.password);
 // };
