@@ -125,7 +125,7 @@ const SignUp = () => {
           className="text-4xl font-extrabold text-center mb-2 tracking-wide"
           style={{ color: colors.primary }}
         >
-          Zaika Box
+          Zaika
         </h1>
         <p className="text-center mb-8 text-gray-700">
           Your gateway to delicious food & happy moments

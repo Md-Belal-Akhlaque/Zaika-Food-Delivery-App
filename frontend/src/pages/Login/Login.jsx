@@ -77,7 +77,7 @@ const Login = () => {
         className="loading-screen absolute top-0 left-0 w-full h-full bg-[#ff6b35] flex items-center justify-center text-white text-2xl font-bold z-50"
         style={{ transform: "translateY(100%)" }}
       >
-        Zaika Box
+        Zaika
       </div>
 
       <div
